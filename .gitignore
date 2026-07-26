@@ -1,0 +1,36 @@
+# Data files to ignore (Huge files and caches)
+data/*.csv
+!data/zone_mapping.csv
+data/*.parquet*
+data/*_parquet/
+data/curated/
+data/road_cache/
+data/mapped/
+data/*.torrent
+data/*.crdownload
+data/*.part
+
+# Generated notebook/map artifacts
+notebooks/*.html
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Soufiane's plans to ignore
+Soufiane_plans/*
+venv/
+src/*
+
+# Backend (Java/Maven) local and generated files
+backend/.idea/
+backend/**/*.iml
+backend/**/target/
