@@ -1,0 +1,18 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: driver-service
+  cassandra:
+    contact-points: localhost       # Cassandra host (localhost for dev, cassandra for Docker)
+    port: 9042                      # Default Cassandra CQL port
+    keyspace-name: taasim           # Your existing keyspace
+    local-datacenter: datacenter1   # Default for single-node Cassandra
+    schema-action: none             # DON'T create/modify tables — they already exist
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
