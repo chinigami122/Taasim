@@ -10,6 +10,11 @@ spring:
     keyspace-name: taasim           # Your existing keyspace
     local-datacenter: datacenter1   # Default for single-node Cassandra
     schema-action: none             # DON'T create/modify tables — they already exist
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
 management:
   endpoints:

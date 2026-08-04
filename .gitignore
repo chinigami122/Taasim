@@ -29,6 +29,7 @@ Thumbs.db
 Soufiane_plans/*
 venv/
 src/*
+0_plans/*
 
 # Backend (Java/Maven) local and generated files
 backend/.idea/
