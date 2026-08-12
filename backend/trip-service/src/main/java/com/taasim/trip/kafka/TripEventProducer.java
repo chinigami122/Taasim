@@ -35,7 +35,16 @@ public class TripEventProducer {
                 "call_type", "A"   // Central booking (same as existing Python producer)
         );
 
-        kafkaTemplate.send(TOPIC, String.valueOf(originZone), event);
+        kafkaTemplate.send(TOPIC, String.valueOf(originZone), event).whenComplete((result, ex) -> {
+            if (ex != null) {
+                System.err.println("❌ Kafka send error (raw.trips): " + ex.getMessage());
+                ex.printStackTrace();
+            } else {
+                System.out.println("✅ Kafka send success (raw.trips) to partition " 
+                        + result.getRecordMetadata().partition() 
+                        + " @ offset " + result.getRecordMetadata().offset());
+            }
+        });
         System.out.println("📡 Kafka → raw.trips: " + tripId);
     }
 }

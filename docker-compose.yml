@@ -17,7 +17,9 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       CLUSTER_ID: LelM2dIFQkiUFvXCEcqRWA
       KAFKA_LOG_RETENTION_HOURS: 168 # 7 days retention
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false" # We create topics explicitly
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true" # Required for __consumer_offsets internal topic in KRaft mode
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1 # Single-node: must be 1
+      KAFKA_OFFSETS_TOPIC_NUM_PARTITIONS: 4     # Fewer partitions for dev
     volumes:
       - kafka_data:/var/lib/kafka/data
 

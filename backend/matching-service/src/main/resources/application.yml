@@ -1,0 +1,30 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: matching-service
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: matching-service-v2
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+    listener:
+      type: single
+      missing-topics-fatal: false
+
+logging:
+  level:
+    org.springframework.kafka: DEBUG
+    org.apache.kafka.clients.consumer: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
