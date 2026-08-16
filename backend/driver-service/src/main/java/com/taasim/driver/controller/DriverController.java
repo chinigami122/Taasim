@@ -2,6 +2,7 @@ package com.taasim.driver.controller;
 
 import com.taasim.driver.dto.GpsPingRequest;
 import com.taasim.driver.model.VehiclePosition;
+import com.taasim.driver.service.DriverService;
 import com.taasim.driver.service.LocationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,9 +20,11 @@ import java.util.Map;
 public class DriverController {
 
     private final LocationService locationService;
+    private final DriverService driverService;
 
-    public DriverController(LocationService locationService) {
+    public DriverController(LocationService locationService, DriverService driverService) {
         this.locationService = locationService;
+        this.driverService = driverService;
     }
 
     /**
@@ -55,5 +58,33 @@ public class DriverController {
                 "zoneId", saved.getZoneId(),
                 "message", "Position saved to Cassandra"
         ));
+    }
+    /** PUT /api/drivers/trips/{driverId}/accept */
+    @PutMapping("/trips/{driverId}/accept")
+    public ResponseEntity<Map<String, Object>> acceptTrip(@PathVariable String driverId) {
+        boolean accepted = driverService.acceptTrip(driverId);
+        if (!accepted) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", "No pending trip for driver " + driverId
+            ));
+        }
+        return ResponseEntity.ok(Map.of(
+                "status", "ok",
+                "message", "Trip accepted",
+                "tripId", driverService.getActiveTrip(driverId)
+        ));
+    }
+    /** PUT /api/drivers/trips/{driverId}/reject */
+    @PutMapping("/trips/{driverId}/reject")
+    public ResponseEntity<Map<String, Object>> rejectTrip(@PathVariable String driverId) {
+        boolean rejected = driverService.rejectTrip(driverId);
+        if (!rejected) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", "No pending trip for driver " + driverId
+            ));
+        }
+        return ResponseEntity.ok(Map.of("status", "ok", "message", "Trip rejected"));
     }
 }

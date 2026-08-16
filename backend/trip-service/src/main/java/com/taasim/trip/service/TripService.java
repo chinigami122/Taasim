@@ -90,6 +90,20 @@ public class TripService {
 
         System.out.println("✅ Trip " + tripId + " → MATCHED");
     }
+    public void updateTripStatus(String tripId, String newStatus) {
+        Trip trip = tripCache.get(tripId);
+        if (trip == null) {
+            System.err.println("⚠️ Trip not found: " + tripId);
+            return;
+        }
+        trip.setStatus(newStatus);
+
+        cassandraTemplate.getCqlOperations().execute(
+                "UPDATE taasim.trips SET status = ? " +
+                        "WHERE city = ? AND date_bucket = ? AND created_at = ?",
+                newStatus, trip.getCity(), trip.getDateBucket(), trip.getCreatedAt()
+        );
+    }
 
     public Trip getTripById(String tripId) {
         return tripCache.get(tripId);
