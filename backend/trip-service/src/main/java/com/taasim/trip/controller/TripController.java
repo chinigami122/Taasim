@@ -36,4 +36,24 @@ public class TripController {
                 "message", "Trip request submitted"
         ));
     }
+
+    /**
+     * GET /api/trips/{tripId}
+     * Returns current trip status.
+     */
+    @GetMapping("/{tripId}")
+    public ResponseEntity<?> getTrip(@PathVariable String tripId) {
+        Trip trip = tripService.getTripById(tripId);
+        if (trip == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(Map.of(
+                "tripId", trip.getTripId(),
+                "status", trip.getStatus(),
+                "driverId", trip.getTaxiId() != null ? trip.getTaxiId() : "",
+                "etaSeconds", trip.getEtaSeconds() != null ? trip.getEtaSeconds() : 0,
+                "originZone", trip.getOriginZone(),
+                "destinationZone", trip.getDestZone()
+        ));
+    }
 }
