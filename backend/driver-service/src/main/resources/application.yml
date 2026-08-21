@@ -1,17 +1,17 @@
 server:
-  port: 8083
+  port: ${SERVER_PORT:8083}
 
 spring:
   application:
     name: driver-service
   cassandra:
-    contact-points: localhost       # Cassandra host (localhost for dev, cassandra for Docker)
-    port: 9042                      # Default Cassandra CQL port
-    keyspace-name: taasim           # Your existing keyspace
-    local-datacenter: datacenter1   # Default for single-node Cassandra
-    schema-action: none             # DON'T create/modify tables — they already exist
+    contact-points: ${CASSANDRA_HOST:localhost}
+    port: ${CASSANDRA_PORT:9042}
+    keyspace-name: ${CASSANDRA_KEYSPACE:taasim}
+    local-datacenter: ${CASSANDRA_DC:datacenter1}
+    schema-action: none
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -25,4 +25,4 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: ${MANAGEMENT_ENDPOINTS:health,info,metrics}

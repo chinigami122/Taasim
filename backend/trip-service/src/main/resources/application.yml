@@ -1,19 +1,19 @@
 server:
-  port: 8082
+  port: ${SERVER_PORT:8082}
 
 spring:
   application:
     name: trip-service
 
   cassandra:
-    contact-points: localhost
-    port: 9042
-    keyspace-name: taasim
-    local-datacenter: datacenter1
+    contact-points: ${CASSANDRA_HOST:localhost}
+    port: ${CASSANDRA_PORT:9042}
+    keyspace-name: ${CASSANDRA_KEYSPACE:taasim}
+    local-datacenter: ${CASSANDRA_DC:datacenter1}
     schema-action: none
 
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -27,4 +27,4 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: ${MANAGEMENT_ENDPOINTS:health,info,metrics}

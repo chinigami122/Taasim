@@ -1,0 +1,44 @@
+services:
+  driver-service:
+    build:
+      context: ./backend
+      dockerfile: driver-service/Dockerfile
+    image: taasim/driver-service:local
+    container_name: taasim-driver
+    ports: ["8083:8083"]
+    environment:
+      CASSANDRA_HOST: cassandra
+      KAFKA_BOOTSTRAP: kafka:9092
+    networks: [taasim-net]
+    restart: unless-stopped
+
+  trip-service:
+    build:
+      context: ./backend
+      dockerfile: trip-service/Dockerfile
+    image: taasim/trip-service:local
+    container_name: taasim-trip
+    ports: ["8082:8082"]
+    environment:
+      CASSANDRA_HOST: cassandra
+      KAFKA_BOOTSTRAP: kafka:9092
+    networks: [taasim-net]
+    restart: unless-stopped
+
+  matching-service:
+    build:
+      context: ./backend
+      dockerfile: matching-service/Dockerfile
+    image: taasim/matching-service:local
+    container_name: taasim-matching
+    ports: ["8085:8085"]
+    environment:
+      CASSANDRA_HOST: cassandra
+      KAFKA_BOOTSTRAP: kafka:9092
+    networks: [taasim-net]
+    restart: unless-stopped
+
+networks:
+  taasim-net:
+    external: true
+    name: taasim_default # match the network your existing compose creates

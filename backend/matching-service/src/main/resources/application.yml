@@ -1,21 +1,21 @@
 server:
-  port: 8085
+  port: ${SERVER_PORT:8085}
 
 spring:
   application:
     name: matching-service
 
   cassandra:
-    contact-points: localhost
-    port: 9042
-    keyspace-name: taasim
-    local-datacenter: datacenter1
+    contact-points: ${CASSANDRA_HOST:localhost}
+    port: ${CASSANDRA_PORT:9042}
+    keyspace-name: ${CASSANDRA_KEYSPACE:taasim}
+    local-datacenter: ${CASSANDRA_DC:datacenter1}
     schema-action: none
 
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
     consumer:
-      group-id: matching-service-v2
+      group-id: ${KAFKA_CONSUMER_GROUP:matching-service-v2}
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -30,11 +30,11 @@ spring:
 
 logging:
   level:
-    org.springframework.kafka: DEBUG
-    org.apache.kafka.clients.consumer: INFO
+    org.springframework.kafka: ${LOG_LEVEL_KAFKA:DEBUG}
+    org.apache.kafka.clients.consumer: ${LOG_LEVEL_CONSUMER:INFO}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: ${MANAGEMENT_ENDPOINTS:health,info,metrics}
