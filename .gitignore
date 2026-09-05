@@ -30,6 +30,7 @@ Soufiane_plans/*
 venv/
 src/*
 0_plans/*
+docs/*
 
 # Backend (Java/Maven) local and generated files
 backend/.idea/
