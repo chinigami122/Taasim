@@ -1,5 +1,7 @@
 # TaaSim Casablanca — Guide de Test et Déploiement (Évaluation)
 
+[![backend-ci](https://github.com/chinigami122/Taasim/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/chinigami122/Taasim/actions/workflows/backend-ci.yml)
+
 Ce projet implémente une plateforme complète de traitement de données géospatiales et temporelles en temps réel (Streaming) et par lots (Batch) pour la gestion du trafic des taxis de Casablanca (TaaSim).
 
 Le code source, les données (extraits dans `submission/donnees_extraits/`) et le rapport de synthèse (`submission/rapport/rapport.tex`) sont inclus dans ce livrable.
