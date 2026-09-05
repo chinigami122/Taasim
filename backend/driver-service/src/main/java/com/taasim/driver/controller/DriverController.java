@@ -87,4 +87,30 @@ public class DriverController {
         }
         return ResponseEntity.ok(Map.of("status", "ok", "message", "Trip rejected"));
     }
-}
+
+    /** PUT /api/drivers/trips/{driverId}/start */
+    @PutMapping("/trips/{driverId}/start")
+    public ResponseEntity<Map<String, Object>> startRide(@PathVariable String driverId) {
+        boolean started = driverService.startRide(driverId);
+        if (!started) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", "No active trip for driver " + driverId
+            ));
+        }
+        return ResponseEntity.ok(Map.of("status", "ok", "message", "Ride started"));
+    }
+
+    /** PUT /api/drivers/trips/{driverId}/complete */
+    @PutMapping("/trips/{driverId}/complete")
+    public ResponseEntity<Map<String, Object>> completeRide(@PathVariable String driverId) {
+        boolean completed = driverService.completeRide(driverId);
+        if (!completed) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", "No active trip for driver " + driverId
+            ));
+        }
+        return ResponseEntity.ok(Map.of("status", "ok", "message", "Ride completed"));
+    }
+}

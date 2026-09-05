@@ -1,5 +1,6 @@
 package com.taasim.driver.service;
 
+import com.taasim.driver.kafka.TripCompletedProducer;
 import com.taasim.driver.kafka.TripStatusProducer;
 import org.springframework.stereotype.Service;
 
@@ -13,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DriverService {
 
     private final TripStatusProducer tripStatusProducer;
+    private final TripCompletedProducer tripCompletedProducer;
 
     // In-memory: driverId → assigned tripId (waiting for accept/reject)
     private final Map<String, String> pendingTrips = new ConcurrentHashMap<>();
@@ -23,8 +25,10 @@ public class DriverService {
     // In-memory: driverId → availability status
     private final Map<String, String> driverStatus = new ConcurrentHashMap<>();
 
-    public DriverService(TripStatusProducer tripStatusProducer) {
+    public DriverService(TripStatusProducer tripStatusProducer,
+                         TripCompletedProducer tripCompletedProducer) {
         this.tripStatusProducer = tripStatusProducer;
+        this.tripCompletedProducer = tripCompletedProducer;
     }
 
     /** Called when a match event assigns a trip to this driver */
@@ -68,4 +72,42 @@ public class DriverService {
     public String getActiveTrip(String driverId) {
         return activeTrips.get(driverId);
     }
-}
+
+    /** Get the driver status */
+    public String getDriverStatus(String driverId) {
+        return driverStatus.get(driverId);
+    }
+
+    /** Driver starts the ride (passenger picked up) */
+    public boolean startRide(String driverId) {
+        String tripId = activeTrips.get(driverId);
+        if (tripId == null) {
+            System.out.println("⚠️ No active trip for driver " + driverId);
+            return false;
+        }
+
+        tripStatusProducer.send(tripId, driverId, "IN_PROGRESS");
+        System.out.println("🚗 Driver " + driverId + " started ride for trip " + tripId);
+        return true;
+    }
+
+    /** Driver completes the ride (arrived at destination) */
+    public boolean completeRide(String driverId) {
+        String tripId = activeTrips.remove(driverId);
+        if (tripId == null) {
+            System.out.println("⚠️ No active trip for driver " + driverId);
+            return false;
+        }
+
+        driverStatus.put(driverId, "AVAILABLE");
+
+        // Send status change
+        tripStatusProducer.send(tripId, driverId, "COMPLETED");
+
+        // Send trip.completed event (for billing service in Slice 15)
+        tripCompletedProducer.send(tripId, driverId);
+
+        System.out.println("🏁 Driver " + driverId + " completed trip " + tripId);
+        return true;
+    }
+}
