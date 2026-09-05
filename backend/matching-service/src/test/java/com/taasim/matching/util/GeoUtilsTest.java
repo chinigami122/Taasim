@@ -8,7 +8,7 @@ class GeoUtilsTest {
     @Test
     void haversine_sameCoordinates_returnsZero() {
         double d = GeoUtils.haversine(33.5731, -7.5898, 33.5731, -7.5898);
-        assertThat(d).isEqualTo(0.0);
+        assertThat(d).isEqualTo(99999.0); // Intentionally broken for CI simulation
     }
 
     @Test
