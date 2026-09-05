@@ -1,3 +1,32 @@
+# TaaSim backend services — Slice 7.5 minimal set
+# =================================================
+# This file brings up ONLY the 3 Spring Boot services you have built so far
+# (driver, trip, matching). It does NOT start any infrastructure — those live
+# in the main `docker-compose.yml` (Kafka, Cassandra, MinIO, Flink, Spark, ...).
+#
+# Two-command workflow:
+#   1. Start ONLY the infra you need (Slice 7.5 needs just Kafka + Cassandra):
+#        docker compose up -d kafka kafka-init cassandra cassandra-init
+#
+#   2. Start the backend services on top:
+#        docker compose -f docker-compose.backend.yml up -d --build
+#
+# CRITICAL — Kafka listener gotcha:
+#   Your main compose exposes Kafka on TWO listeners:
+#     INTERNAL (kafka:29092)  ← for other DOCKER containers (that's us)
+#     EXTERNAL (localhost:9092) ← for your Windows host running `java -jar`
+#   Docker-based services MUST use kafka:29092. That's why KAFKA_BOOTSTRAP below
+#   points to kafka:29092 and not kafka:9092.
+#
+# Add services here as you build them in later slices:
+#   Slice 9  → auth-service (needs postgres)
+#   Slice 12 → gateway-service
+#   Slice 13 → geospatial-service (needs redis)
+#   Slice 15 → billing-service
+#
+# The infra containers for those (postgres, redis) get added to the main
+# docker-compose.yml at the slice that introduces them.
+
 services:
   driver-service:
     build:
@@ -5,11 +34,17 @@ services:
       dockerfile: driver-service/Dockerfile
     image: taasim/driver-service:local
     container_name: taasim-driver
-    ports: ["8083:8083"]
+    ports:
+      - "8083:8083"
     environment:
+      SERVER_PORT: "8083"
       CASSANDRA_HOST: cassandra
-      KAFKA_BOOTSTRAP: kafka:9092
-    networks: [taasim-net]
+      CASSANDRA_PORT: "9042"
+      CASSANDRA_KEYSPACE: taasim
+      CASSANDRA_DC: datacenter1
+      KAFKA_BOOTSTRAP: kafka:29092   # INTERNAL listener — see note above
+    networks:
+      - taasim-net
     restart: unless-stopped
 
   trip-service:
@@ -18,11 +53,17 @@ services:
       dockerfile: trip-service/Dockerfile
     image: taasim/trip-service:local
     container_name: taasim-trip
-    ports: ["8082:8082"]
+    ports:
+      - "8082:8082"
     environment:
+      SERVER_PORT: "8082"
       CASSANDRA_HOST: cassandra
-      KAFKA_BOOTSTRAP: kafka:9092
-    networks: [taasim-net]
+      CASSANDRA_PORT: "9042"
+      CASSANDRA_KEYSPACE: taasim
+      CASSANDRA_DC: datacenter1
+      KAFKA_BOOTSTRAP: kafka:29092
+    networks:
+      - taasim-net
     restart: unless-stopped
 
   matching-service:
@@ -31,14 +72,26 @@ services:
       dockerfile: matching-service/Dockerfile
     image: taasim/matching-service:local
     container_name: taasim-matching
-    ports: ["8085:8085"]
+    ports:
+      - "8085:8085"
     environment:
+      SERVER_PORT: "8085"
       CASSANDRA_HOST: cassandra
-      KAFKA_BOOTSTRAP: kafka:9092
-    networks: [taasim-net]
+      CASSANDRA_PORT: "9042"
+      CASSANDRA_KEYSPACE: taasim
+      CASSANDRA_DC: datacenter1
+      KAFKA_BOOTSTRAP: kafka:29092
+      KAFKA_CONSUMER_GROUP: matching-service-docker
+      LOG_LEVEL_KAFKA: INFO
+    networks:
+      - taasim-net
     restart: unless-stopped
 
+# Attach to the same network the main compose creates. When your project
+# folder is `Taasim`, docker-compose names the default network `taasim_default`.
+# If your folder has a different casing/name, run `docker network ls` and
+# put the exact name here.
 networks:
   taasim-net:
     external: true
-    name: taasim_default # match the network your existing compose creates
+    name: taasim_default

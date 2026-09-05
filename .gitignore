@@ -35,3 +35,14 @@ src/*
 backend/.idea/
 backend/**/*.iml
 backend/**/target/
+**/target/
+.metals/
+.vscode/
+.settings/
+.classpath
+.project
+
+# Environment / secrets (Slice 7.5 → Slice 10.5)
+.env
+.env.local
+*.secret

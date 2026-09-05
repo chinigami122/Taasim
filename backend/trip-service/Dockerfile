@@ -2,19 +2,18 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /app
 
-# Copy parent + all module poms (required by Maven Reactor)
+# Copy parent + all module poms
 COPY pom.xml .
 COPY common/pom.xml common/
 COPY driver-service/pom.xml driver-service/
 COPY trip-service/pom.xml trip-service/
 COPY matching-service/pom.xml matching-service/
 
-# Download deps only (fast rebuilds when only src changes)
-RUN mvn -pl trip-service -am dependency:go-offline -B
-
+# Copy sources for common and trip-service
 COPY common/src common/src
 COPY trip-service/src trip-service/src
 
+# Build package
 RUN mvn -pl trip-service -am clean package -DskipTests -B
 
 # ---- Runtime stage ----

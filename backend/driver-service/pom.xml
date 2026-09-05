@@ -42,6 +42,8 @@
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
         </dependency>
+
+        <!-- ================ Test scope ================ -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -53,15 +55,11 @@
             <artifactId>spring-kafka-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>com.taasim</groupId>
-            <artifactId>trip-service</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
-            <scope>test</scope>
-        </dependency>
+
+        <!-- NOTE: Removed the circular test-scope dependency on trip-service.
+             Two sibling modules must never depend on each other in ANY scope —
+             it makes Maven's reactor build order ambiguous and breaks CI. -->
     </dependencies>
-
-
 
     <build>
         <plugins>
