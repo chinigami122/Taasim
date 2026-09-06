@@ -38,8 +38,7 @@
     <modules>
         <module>common</module>
         <module>driver-service</module>
-<!--        We will uncomment these as we create their folders:-->
-<!--        <module>auth-service</module>-->
+        <module>auth-service</module>
 <!--        <module>gateway-service</module>-->
         <module>trip-service</module>
         <module>matching-service</module>

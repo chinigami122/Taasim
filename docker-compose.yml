@@ -19,7 +19,7 @@ services:
       KAFKA_LOG_RETENTION_HOURS: 168 # 7 days retention
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true" # Required for __consumer_offsets internal topic in KRaft mode
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1 # Single-node: must be 1
-      KAFKA_OFFSETS_TOPIC_NUM_PARTITIONS: 4     # Fewer partitions for dev
+      KAFKA_OFFSETS_TOPIC_NUM_PARTITIONS: 4 # Fewer partitions for dev
     volumes:
       - kafka_data:/var/lib/kafka/data
 
@@ -186,6 +186,19 @@ services:
       TOPICS: "raw.gps,raw.trips"
     restart: unless-stopped
 
+  # ── PostgreSQL (Auth + Billing) ──
+  postgres:
+    image: postgres:16
+    container_name: taasim-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: taasim
+      POSTGRES_PASSWORD: taasim
+      POSTGRES_DB: taasim
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   # ── 8. Grafana ────────────────────────────────────────────────────────
   # grafana:
   #   image: grafana/grafana:latest
@@ -230,3 +243,4 @@ volumes:
   kafka_data:
   minio_data:
   cassandra_data:
+  postgres_data:

@@ -6,6 +6,7 @@ WORKDIR /app
 COPY pom.xml .
 COPY common/pom.xml common/
 COPY driver-service/pom.xml driver-service/
+COPY auth-service/pom.xml auth-service/
 COPY trip-service/pom.xml trip-service/
 COPY matching-service/pom.xml matching-service/
 
