@@ -33,6 +33,9 @@ public class User {
     @Column(name = "created_at")
     private Instant createdAt = Instant.now();
 
+    @Column(name = "stripe_customer_id")
+    private String stripeCustomerId;
+
     public User() {}
 
     public UUID getId() { return id; }
@@ -58,4 +61,7 @@ public class User {
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+
+    public String getStripeCustomerId() { return stripeCustomerId; }
+    public void setStripeCustomerId(String stripeCustomerId) { this.stripeCustomerId = stripeCustomerId; }
 }

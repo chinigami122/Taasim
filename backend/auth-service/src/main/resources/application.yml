@@ -13,11 +13,16 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update          # Auto-creates tables from @Entity classes
+      ddl-auto: validate        # Only validates entity mappings match existing schema
     show-sql: true              # Log SQL queries for debugging
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true   # Allows Flyway to baseline an existing DB
+    locations: classpath:db/migration
 
 management:
   endpoints:
