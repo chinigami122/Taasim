@@ -1,9 +1,12 @@
 package com.taasim.auth.service;
 
+import com.taasim.auth.dto.AuthResponse;
+import com.taasim.auth.dto.LoginRequest;
 import com.taasim.auth.dto.RegisterRequest;
 import com.taasim.auth.model.Role;
 import com.taasim.auth.model.User;
 import com.taasim.auth.repository.UserRepository;
+import com.taasim.auth.security.JwtTokenProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,12 +29,17 @@ class AuthServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    private JwtTokenProvider jwtTokenProvider;
     private AuthService authService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(userRepository);
+        jwtTokenProvider = new JwtTokenProvider(
+                "taasim-super-secret-key-that-is-at-least-256-bits-long-change-me",
+                86400000
+        );
+        authService = new AuthService(userRepository, jwtTokenProvider);
     }
 
     @Test
@@ -96,5 +105,61 @@ class AuthServiceTest {
         User result = authService.register(request);
 
         assertThat(result.getRole()).isEqualTo(Role.CLIENT);
+    }
+
+    @Test
+    void login_validCredentials_returnsAuthResponseWithToken() {
+        LoginRequest request = new LoginRequest("soufiane@test.com", "password123");
+
+        User user = new User();
+        user.setId(UUID.randomUUID());
+        user.setEmail("soufiane@test.com");
+        user.setPassword(passwordEncoder.encode("password123"));
+        user.setFullName("Soufiane B");
+        user.setRole(Role.DRIVER);
+
+        when(userRepository.findByEmail("soufiane@test.com")).thenReturn(Optional.of(user));
+
+        AuthResponse response = authService.login(request);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getEmail()).isEqualTo("soufiane@test.com");
+        assertThat(response.getFullName()).isEqualTo("Soufiane B");
+        assertThat(response.getRole()).isEqualTo("DRIVER");
+        assertThat(response.getAccessToken()).isNotBlank();
+
+        // Verify token can be parsed
+        String extractedUserId = jwtTokenProvider.validateTokenAndGetUserId(response.getAccessToken());
+        assertThat(extractedUserId).isEqualTo(user.getId().toString());
+        String extractedRole = jwtTokenProvider.getRoleFromToken(response.getAccessToken());
+        assertThat(extractedRole).isEqualTo("DRIVER");
+    }
+
+    @Test
+    void login_userNotFound_throwsException() {
+        LoginRequest request = new LoginRequest("unknown@test.com", "password123");
+
+        when(userRepository.findByEmail("unknown@test.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("User not found");
+    }
+
+    @Test
+    void login_invalidPassword_throwsException() {
+        LoginRequest request = new LoginRequest("soufiane@test.com", "wrongPassword");
+
+        User user = new User();
+        user.setId(UUID.randomUUID());
+        user.setEmail("soufiane@test.com");
+        user.setPassword(passwordEncoder.encode("correctPassword"));
+        user.setRole(Role.CLIENT);
+
+        when(userRepository.findByEmail("soufiane@test.com")).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Invalid password");
     }
 }

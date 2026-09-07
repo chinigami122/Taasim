@@ -1,9 +1,12 @@
 package com.taasim.auth;
 
+import com.taasim.auth.dto.AuthResponse;
+import com.taasim.auth.dto.LoginRequest;
 import com.taasim.auth.dto.RegisterRequest;
 import com.taasim.auth.model.Role;
 import com.taasim.auth.model.User;
 import com.taasim.auth.repository.UserRepository;
+import com.taasim.auth.security.JwtTokenProvider;
 import com.taasim.auth.service.AuthService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -91,5 +94,43 @@ class AuthRegistrationIT {
         assertThatThrownBy(() -> authService.register(duplicate))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Email already registered: duplicate@taasim.com");
+    }
+
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
+    @Test
+    void registerAndLogin_endToEnd_returnsValidJwtToken() {
+        // 1. Register
+        RegisterRequest registerReq = new RegisterRequest();
+        registerReq.setEmail("jwt_test@taasim.com");
+        registerReq.setPassword("secretPassword");
+        registerReq.setFullName("JWT Test User");
+        registerReq.setRole("DRIVER");
+
+        User registered = authService.register(registerReq);
+        assertThat(registered).isNotNull();
+
+        // 2. Login with valid credentials
+        LoginRequest loginReq = new LoginRequest("jwt_test@taasim.com", "secretPassword");
+        AuthResponse authResponse = authService.login(loginReq);
+
+        assertThat(authResponse).isNotNull();
+        assertThat(authResponse.getEmail()).isEqualTo("jwt_test@taasim.com");
+        assertThat(authResponse.getRole()).isEqualTo("DRIVER");
+        assertThat(authResponse.getAccessToken()).isNotBlank();
+
+        // 3. Verify JWT claims
+        String token = authResponse.getAccessToken();
+        String userIdFromToken = jwtTokenProvider.validateTokenAndGetUserId(token);
+        assertThat(userIdFromToken).isEqualTo(registered.getId().toString());
+        String roleFromToken = jwtTokenProvider.getRoleFromToken(token);
+        assertThat(roleFromToken).isEqualTo("DRIVER");
+
+        // 4. Verify login fails with wrong password
+        LoginRequest wrongLogin = new LoginRequest("jwt_test@taasim.com", "wrongPassword");
+        assertThatThrownBy(() -> authService.login(wrongLogin))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Invalid password");
     }
 }

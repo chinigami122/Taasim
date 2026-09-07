@@ -1,5 +1,7 @@
 package com.taasim.auth.controller;
 
+import com.taasim.auth.dto.AuthResponse;
+import com.taasim.auth.dto.LoginRequest;
 import com.taasim.auth.dto.RegisterRequest;
 import com.taasim.auth.model.User;
 import com.taasim.auth.service.AuthService;
@@ -33,6 +35,16 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of(
                     "error", e.getMessage()
             ));
+        }
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+        try {
+            AuthResponse response = authService.login(request);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
         }
     }
 }
