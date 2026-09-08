@@ -1,7 +1,14 @@
 package com.taasim.auth.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "User login credentials payload")
 public class LoginRequest {
+
+    @Schema(description = "Registered email address", example = "soufiane@test.com", requiredMode = Schema.RequiredMode.REQUIRED)
     private String email;
+
+    @Schema(description = "Account password", example = "secret123", requiredMode = Schema.RequiredMode.REQUIRED)
     private String password;
 
     public LoginRequest() {}

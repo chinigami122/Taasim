@@ -1,19 +1,17 @@
 package com.taasim.trip.dto;
 
-/**
- * JSON body for POST /api/trips/request
- *
- * Example:
- * {
- *   "riderId": "rider_1234",
- *   "originZone": 5,
- *   "destinationZone": 12
- * }
- */
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Trip booking request payload")
 public class TripRequestDto {
 
+    @Schema(description = "Rider user identifier", example = "rider_1234", requiredMode = Schema.RequiredMode.REQUIRED)
     private String riderId;
+
+    @Schema(description = "Pickup origin zone ID (1 to 16)", example = "5", minimum = "1", maximum = "16", requiredMode = Schema.RequiredMode.REQUIRED)
     private int originZone;
+
+    @Schema(description = "Dropoff destination zone ID (1 to 16)", example = "12", minimum = "1", maximum = "16", requiredMode = Schema.RequiredMode.REQUIRED)
     private int destinationZone;
 
     public TripRequestDto() {}

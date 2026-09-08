@@ -133,4 +133,14 @@ class AuthRegistrationIT {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Invalid password");
     }
+
+    @Autowired
+    private org.springframework.boot.test.web.client.TestRestTemplate restTemplate;
+
+    @Test
+    void apiDocs_noToken_returns200() {
+        var response = restTemplate.getForEntity("/v3/api-docs", String.class);
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.getBody()).contains("TaaSim Auth Service API");
+    }
 }

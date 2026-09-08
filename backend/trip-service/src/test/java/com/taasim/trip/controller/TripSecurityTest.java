@@ -130,4 +130,11 @@ class TripSecurityTest {
                         .header("Authorization", "Bearer " + clientToken))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void apiDocs_noToken_bypassesSecurity() throws Exception {
+        // In WebMvcTest, /v3/api-docs reaches DispatcherServlet (404) rather than being blocked with 401 Unauthorized
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isNotFound());
+    }
 }

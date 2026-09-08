@@ -21,6 +21,7 @@ import java.util.Date;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -118,5 +119,12 @@ class DriverSecurityTest {
         mockMvc.perform(put("/api/drivers/trips/taxi_001/accept")
                         .header("Authorization", "Bearer " + driverToken))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void apiDocs_noToken_bypassesSecurity() throws Exception {
+        // In WebMvcTest, /v3/api-docs reaches DispatcherServlet (404) rather than being blocked with 401 Unauthorized
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isNotFound());
     }
 }

@@ -1,21 +1,20 @@
 package com.taasim.driver.dto;
 
-/**
- * JSON body for POST /api/drivers/location
- *
- * Example:
- * {
- *   "driverId": "taxi_001",
- *   "lat": 33.5731,
- *   "lon": -7.5898,
- *   "speed": 35.0
- * }
- */
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Driver telemetry GPS ping payload")
 public class GpsPingRequest {
 
+    @Schema(description = "Driver taxi vehicle identifier", example = "taxi_001", requiredMode = Schema.RequiredMode.REQUIRED)
     private String driverId;
+
+    @Schema(description = "GPS Latitude coordinate", example = "33.5731", requiredMode = Schema.RequiredMode.REQUIRED)
     private double lat;
+
+    @Schema(description = "GPS Longitude coordinate", example = "-7.5898", requiredMode = Schema.RequiredMode.REQUIRED)
     private double lon;
+
+    @Schema(description = "Vehicle speed in km/h", example = "35.0")
     private double speed;
 
     // Default constructor (required by Jackson JSON parser)
