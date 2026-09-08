@@ -5,6 +5,7 @@ import com.taasim.driver.model.VehiclePosition;
 import com.taasim.driver.service.DriverService;
 import com.taasim.driver.service.LocationService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -46,6 +47,7 @@ public class DriverController {
      *   "message": "Position saved to Cassandra"
      * }
      */
+    @PreAuthorize("hasRole('DRIVER')")
     @PostMapping("/location")
     public ResponseEntity<Map<String, Object>> receiveLocation(
             @RequestBody GpsPingRequest request) {
@@ -60,6 +62,7 @@ public class DriverController {
         ));
     }
     /** PUT /api/drivers/trips/{driverId}/accept */
+    @PreAuthorize("hasRole('DRIVER')")
     @PutMapping("/trips/{driverId}/accept")
     public ResponseEntity<Map<String, Object>> acceptTrip(@PathVariable String driverId) {
         boolean accepted = driverService.acceptTrip(driverId);
@@ -76,6 +79,7 @@ public class DriverController {
         ));
     }
     /** PUT /api/drivers/trips/{driverId}/reject */
+    @PreAuthorize("hasRole('DRIVER')")
     @PutMapping("/trips/{driverId}/reject")
     public ResponseEntity<Map<String, Object>> rejectTrip(@PathVariable String driverId) {
         boolean rejected = driverService.rejectTrip(driverId);
@@ -89,6 +93,7 @@ public class DriverController {
     }
 
     /** PUT /api/drivers/trips/{driverId}/start */
+    @PreAuthorize("hasRole('DRIVER')")
     @PutMapping("/trips/{driverId}/start")
     public ResponseEntity<Map<String, Object>> startRide(@PathVariable String driverId) {
         boolean started = driverService.startRide(driverId);
@@ -102,6 +107,7 @@ public class DriverController {
     }
 
     /** PUT /api/drivers/trips/{driverId}/complete */
+    @PreAuthorize("hasRole('DRIVER')")
     @PutMapping("/trips/{driverId}/complete")
     public ResponseEntity<Map<String, Object>> completeRide(@PathVariable String driverId) {
         boolean completed = driverService.completeRide(driverId);

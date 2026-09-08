@@ -28,3 +28,6 @@ management:
     web:
       exposure:
         include: ${MANAGEMENT_ENDPOINTS:health,info,metrics}
+
+jwt:
+  secret: ${JWT_SECRET:dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}

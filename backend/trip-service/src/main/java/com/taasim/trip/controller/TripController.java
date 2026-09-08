@@ -4,6 +4,7 @@ import com.taasim.trip.dto.TripRequestDto;
 import com.taasim.trip.model.Trip;
 import com.taasim.trip.service.TripService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -24,6 +25,7 @@ public class TripController {
      * Body: { "riderId": "rider_1234", "originZone": 5, "destinationZone": 12 }
      * Response: { "tripId": "uuid...", "status": "REQUESTED" }
      */
+    @PreAuthorize("hasRole('CLIENT')")
     @PostMapping("/request")
     public ResponseEntity<Map<String, Object>> requestTrip(@RequestBody TripRequestDto request) {
         Trip trip = tripService.createTrip(request);
@@ -41,6 +43,7 @@ public class TripController {
      * GET /api/trips/{tripId}
      * Returns current trip status.
      */
+    @PreAuthorize("hasAnyRole('CLIENT', 'DRIVER')")
     @GetMapping("/{tripId}")
     public ResponseEntity<?> getTrip(@PathVariable String tripId) {
         Trip trip = tripService.getTripById(tripId);
