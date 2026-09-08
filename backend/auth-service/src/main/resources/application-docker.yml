@@ -1,0 +1,6 @@
+# Overrides applied when SPRING_PROFILES_ACTIVE=docker
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/taasim   # container network name
+  jpa:
+    show-sql: false                                # no SQL noise in container logs

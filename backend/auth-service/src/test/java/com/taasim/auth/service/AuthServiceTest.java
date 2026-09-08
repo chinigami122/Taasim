@@ -36,7 +36,7 @@ class AuthServiceTest {
     @BeforeEach
     void setUp() {
         jwtTokenProvider = new JwtTokenProvider(
-                "taasim-super-secret-key-that-is-at-least-256-bits-long-change-me",
+                "dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234",
                 86400000
         );
         authService = new AuthService(userRepository, jwtTokenProvider);

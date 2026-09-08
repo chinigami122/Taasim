@@ -1,9 +1,11 @@
 server:
-  port: 8081
+  port: ${SERVER_PORT:8081}
 
 spring:
   application:
     name: auth-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
 
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:taasim}
@@ -14,7 +16,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate        # Only validates entity mappings match existing schema
-    show-sql: true              # Log SQL queries for debugging
+    show-sql: ${JPA_SHOW_SQL:true}
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -24,13 +26,12 @@ spring:
     baseline-on-migrate: true   # Allows Flyway to baseline an existing DB
     locations: classpath:db/migration
 
+jwt:
+  secret: ${JWT_SECRET:dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}
+  expiration: ${JWT_EXPIRATION_MS:86400000}    # 24 hours in milliseconds
+
 management:
   endpoints:
     web:
       exposure:
-        include: health
-
-jwt:
-  secret: ${JWT_SECRET:taasim-super-secret-key-that-is-at-least-256-bits-long-change-me}
-  expiration: 86400000    # 24 hours in milliseconds
-
+        include: ${ACTUATOR_ENDPOINTS:health,info}

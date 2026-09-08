@@ -1,0 +1,15 @@
+# Overrides for production. JWT_SECRET, POSTGRES_PASSWORD, etc. MUST come from env.
+spring:
+  jpa:
+    show-sql: false
+  flyway:
+    validate-migration-naming: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus     # narrow surface, no info leak
+  endpoint:
+    health:
+      show-details: never              # never leak dependency versions to public

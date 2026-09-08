@@ -28,12 +28,29 @@
 # docker-compose.yml at the slice that introduces them.
 
 services:
+  auth-service:
+    build:
+      context: ./backend
+      dockerfile: auth-service/Dockerfile
+    image: taasim/auth-service:local
+    container_name: taasim-auth
+    env_file: .env
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: postgres
+    ports:
+      - "8081:8081"
+    networks:
+      - taasim-net
+    restart: unless-stopped
+
   driver-service:
     build:
       context: ./backend
       dockerfile: driver-service/Dockerfile
     image: taasim/driver-service:local
     container_name: taasim-driver
+    env_file: .env
     ports:
       - "8083:8083"
     environment:
@@ -53,6 +70,7 @@ services:
       dockerfile: trip-service/Dockerfile
     image: taasim/trip-service:local
     container_name: taasim-trip
+    env_file: .env
     ports:
       - "8082:8082"
     environment:
@@ -72,6 +90,7 @@ services:
       dockerfile: matching-service/Dockerfile
     image: taasim/matching-service:local
     container_name: taasim-matching
+    env_file: .env
     ports:
       - "8085:8085"
     environment:
