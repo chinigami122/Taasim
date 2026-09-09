@@ -1,31 +1,7 @@
-# TaaSim backend services — Slice 7.5 minimal set
-# =================================================
-# This file brings up ONLY the 3 Spring Boot services you have built so far
-# (driver, trip, matching). It does NOT start any infrastructure — those live
-# in the main `docker-compose.yml` (Kafka, Cassandra, MinIO, Flink, Spark, ...).
-#
-# Two-command workflow:
-#   1. Start ONLY the infra you need (Slice 7.5 needs just Kafka + Cassandra):
-#        docker compose up -d kafka kafka-init cassandra cassandra-init
-#
-#   2. Start the backend services on top:
-#        docker compose -f docker-compose.backend.yml up -d --build
-#
-# CRITICAL — Kafka listener gotcha:
-#   Your main compose exposes Kafka on TWO listeners:
-#     INTERNAL (kafka:29092)  ← for other DOCKER containers (that's us)
-#     EXTERNAL (localhost:9092) ← for your Windows host running `java -jar`
-#   Docker-based services MUST use kafka:29092. That's why KAFKA_BOOTSTRAP below
-#   points to kafka:29092 and not kafka:9092.
-#
-# Add services here as you build them in later slices:
-#   Slice 9  → auth-service (needs postgres)
-#   Slice 12 → gateway-service
-#   Slice 13 → geospatial-service (needs redis)
-#   Slice 15 → billing-service
-#
-# The infra containers for those (postgres, redis) get added to the main
-# docker-compose.yml at the slice that introduces them.
+# TaaSim backend services — Optimized Dev Configuration
+# =======================================================
+# Brings up the Spring Boot services with JVM & Docker resource
+# constraints to minimize CPU and RAM footprint on the development machine.
 
 services:
   auth-service:
@@ -38,8 +14,14 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       POSTGRES_HOST: postgres
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC"
     ports:
       - "8081:8081"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 384M
     networks:
       - taasim-net
     restart: unless-stopped
@@ -59,7 +41,13 @@ services:
       CASSANDRA_PORT: "9042"
       CASSANDRA_KEYSPACE: taasim
       CASSANDRA_DC: datacenter1
-      KAFKA_BOOTSTRAP: kafka:29092   # INTERNAL listener — see note above
+      KAFKA_BOOTSTRAP: kafka:29092
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 384M
     networks:
       - taasim-net
     restart: unless-stopped
@@ -80,6 +68,12 @@ services:
       CASSANDRA_KEYSPACE: taasim
       CASSANDRA_DC: datacenter1
       KAFKA_BOOTSTRAP: kafka:29092
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 384M
     networks:
       - taasim-net
     restart: unless-stopped
@@ -102,14 +96,16 @@ services:
       KAFKA_BOOTSTRAP: kafka:29092
       KAFKA_CONSUMER_GROUP: matching-service-docker
       LOG_LEVEL_KAFKA: INFO
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 384M
     networks:
       - taasim-net
     restart: unless-stopped
 
-# Attach to the same network the main compose creates. When your project
-# folder is `Taasim`, docker-compose names the default network `taasim_default`.
-# If your folder has a different casing/name, run `docker network ls` and
-# put the exact name here.
 networks:
   taasim-net:
     external: true
