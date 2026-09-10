@@ -22,6 +22,13 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
                 <groupId>org.testcontainers</groupId>
                 <artifactId>testcontainers-bom</artifactId>
                 <version>1.20.4</version>
@@ -33,13 +40,14 @@
 
     <properties>
         <java.version>21</java.version>
+        <spring-cloud.version>2024.0.0</spring-cloud.version>
     </properties>
 
     <modules>
         <module>common</module>
         <module>driver-service</module>
         <module>auth-service</module>
-<!--        <module>gateway-service</module>-->
+        <module>gateway-service</module>
         <module>trip-service</module>
         <module>matching-service</module>
 <!--        <module>geospatial-service</module>-->

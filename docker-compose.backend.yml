@@ -106,6 +106,30 @@ services:
       - taasim-net
     restart: unless-stopped
 
+  gateway-service:
+    build:
+      context: ./backend
+      dockerfile: gateway-service/Dockerfile
+    image: taasim/gateway-service:local
+    container_name: taasim-gateway
+    env_file: .env
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_PORT: "8080"
+      AUTH_SERVICE_URI: http://auth-service:8081
+      TRIP_SERVICE_URI: http://trip-service:8082
+      DRIVER_SERVICE_URI: http://driver-service:8083
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 384M
+    networks:
+      - taasim-net
+    restart: unless-stopped
+
 networks:
   taasim-net:
     external: true
