@@ -36,12 +36,8 @@ spring:
       globalcors:
         corsConfigurations:
           '[/**]':
-            allowedOrigins:
-              - "http://localhost:3000"
-              - "http://localhost:3001"    # Client React app
-              - "http://localhost:3002"    # Driver React app
-              - "http://localhost:3003"    # Admin React app
-              - "http://localhost:5173"    # Vite default dev server
+            allowedOriginPatterns:
+              - "*"
             allowedMethods:
               - "GET"
               - "POST"
