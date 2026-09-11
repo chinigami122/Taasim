@@ -1,14 +1,34 @@
-# TaaSim backend services — Optimized Dev Configuration
-# =======================================================
-# Brings up the Spring Boot services with JVM & Docker resource
-# constraints to minimize CPU and RAM footprint on the development machine.
+# TaaSim — Published Production/Staging Compose File
+# ===================================================
+# Runs pre-built Docker images directly from GitHub Container Registry (GHCR)
+# without requiring local source code compilation or build steps.
 
 services:
+  gateway-service:
+    image: ghcr.io/chinigami122/taasim/gateway-service:latest
+    container_name: taasim-gateway
+    env_file: .env
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_PORT: "8080"
+      AUTH_SERVICE_URI: http://auth-service:8081
+      TRIP_SERVICE_URI: http://trip-service:8082
+      DRIVER_SERVICE_URI: http://driver-service:8083
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 384M
+    networks:
+      - taasim-net
+    restart: unless-stopped
+
   auth-service:
-    build:
-      context: ./backend
-      dockerfile: auth-service/Dockerfile
-    image: taasim/auth-service:local
+    image: ghcr.io/chinigami122/taasim/auth-service:latest
     container_name: taasim-auth
     env_file: .env
     environment:
@@ -27,10 +47,7 @@ services:
     restart: unless-stopped
 
   driver-service:
-    build:
-      context: ./backend
-      dockerfile: driver-service/Dockerfile
-    image: taasim/driver-service:local
+    image: ghcr.io/chinigami122/taasim/driver-service:latest
     container_name: taasim-driver
     env_file: .env
     ports:
@@ -53,10 +70,7 @@ services:
     restart: unless-stopped
 
   trip-service:
-    build:
-      context: ./backend
-      dockerfile: trip-service/Dockerfile
-    image: taasim/trip-service:local
+    image: ghcr.io/chinigami122/taasim/trip-service:latest
     container_name: taasim-trip
     env_file: .env
     ports:
@@ -79,10 +93,7 @@ services:
     restart: unless-stopped
 
   matching-service:
-    build:
-      context: ./backend
-      dockerfile: matching-service/Dockerfile
-    image: taasim/matching-service:local
+    image: ghcr.io/chinigami122/taasim/matching-service:latest
     container_name: taasim-matching
     env_file: .env
     ports:
@@ -96,32 +107,6 @@ services:
       KAFKA_BOOTSTRAP: kafka:29092
       KAFKA_CONSUMER_GROUP: matching-service-docker
       LOG_LEVEL_KAFKA: INFO
-      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC"
-    deploy:
-      resources:
-        limits:
-          cpus: '0.50'
-          memory: 384M
-    networks:
-      - taasim-net
-    restart: unless-stopped
-
-  gateway-service:
-    build:
-      context: ./backend
-      dockerfile: gateway-service/Dockerfile
-    image: taasim/gateway-service:local
-    container_name: taasim-gateway
-    env_file: .env
-    ports:
-      - "8080:8080"
-    environment:
-      SERVER_PORT: "8080"
-      AUTH_SERVICE_URI: http://auth-service:8081
-      TRIP_SERVICE_URI: http://trip-service:8082
-      DRIVER_SERVICE_URI: http://driver-service:8083
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
       JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC"
     deploy:
       resources:

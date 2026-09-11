@@ -1,0 +1,7 @@
+management:
+  health:
+    redis:
+      enabled: false
+
+jwt:
+  secret: dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234

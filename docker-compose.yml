@@ -241,8 +241,19 @@ services:
   #     PYTHONPATH: /opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip
   #   restart: unless-stopped
 
+  # ── Redis (Rate Limiting & Geospatial Caching) ────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: taasim-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
 volumes:
   kafka_data:
   minio_data:
   cassandra_data:
   postgres_data:
+  redis_data:

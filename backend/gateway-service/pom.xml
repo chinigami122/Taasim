@@ -23,6 +23,19 @@
             <artifactId>spring-cloud-starter-gateway</artifactId>
         </dependency>
 
+        <!-- Common module for JwtUtils -->
+        <dependency>
+            <groupId>com.taasim</groupId>
+            <artifactId>common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Reactive Redis for distributed rate limiting -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+        </dependency>
+
         <!-- Spring Boot Actuator for health check -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
