@@ -42,6 +42,7 @@ services:
       CASSANDRA_KEYSPACE: taasim
       CASSANDRA_DC: datacenter1
       KAFKA_BOOTSTRAP: kafka:29092
+      GEOSPATIAL_SERVICE_URL: http://geospatial-service:8084
       JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC"
     deploy:
       resources:
@@ -106,6 +107,29 @@ services:
       - taasim-net
     restart: unless-stopped
 
+  geospatial-service:
+    build:
+      context: ./backend
+      dockerfile: geospatial-service/Dockerfile
+    image: taasim/geospatial-service:local
+    container_name: taasim-geospatial
+    env_file: .env
+    ports:
+      - "8084:8084"
+    environment:
+      SERVER_PORT: "8084"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 384M
+    networks:
+      - taasim-net
+    restart: unless-stopped
+
   gateway-service:
     build:
       context: ./backend
@@ -120,6 +144,7 @@ services:
       AUTH_SERVICE_URI: http://auth-service:8081
       TRIP_SERVICE_URI: http://trip-service:8082
       DRIVER_SERVICE_URI: http://driver-service:8083
+      GEO_SERVICE_URI: http://geospatial-service:8084
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC"

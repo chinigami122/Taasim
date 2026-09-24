@@ -12,12 +12,12 @@ COPY matching-service/pom.xml matching-service/
 COPY gateway-service/pom.xml gateway-service/
 COPY geospatial-service/pom.xml geospatial-service/
 
-# Copy sources for common and trip-service
+# Copy sources for common and geospatial-service
 COPY common/src common/src
-COPY trip-service/src trip-service/src
+COPY geospatial-service/src geospatial-service/src
 
 # Build package
-RUN mvn -pl trip-service -am clean package -DskipTests -B
+RUN mvn -pl geospatial-service -am clean package -DskipTests -B
 
 # ---- Runtime stage ----
 FROM eclipse-temurin:21-jre-alpine
@@ -27,10 +27,10 @@ WORKDIR /app
 RUN addgroup -S taasim && adduser -S taasim -G taasim
 USER taasim
 
-COPY --from=build /app/trip-service/target/trip-service-*.jar app.jar
+COPY --from=build /app/geospatial-service/target/geospatial-service-*.jar app.jar
 
-EXPOSE 8082
+EXPOSE 8084
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD wget -q --spider http://localhost:8082/actuator/health || exit 1
+  CMD wget -q --spider http://localhost:8084/actuator/health || exit 1
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

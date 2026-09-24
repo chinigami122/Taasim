@@ -24,7 +24,8 @@ public class JwtGatewayFilter implements WebFilter {
             "/api/auth/login",
             "/actuator",
             "/v3/api-docs",
-            "/swagger-ui"
+            "/swagger-ui",
+            "/internal"
     );
 
     private final JwtUtils jwtUtils;

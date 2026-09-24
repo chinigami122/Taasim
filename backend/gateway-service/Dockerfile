@@ -10,6 +10,7 @@ COPY auth-service/pom.xml auth-service/
 COPY trip-service/pom.xml trip-service/
 COPY matching-service/pom.xml matching-service/
 COPY gateway-service/pom.xml gateway-service/
+COPY geospatial-service/pom.xml geospatial-service/
 
 # Copy sources for common and gateway-service
 COPY common/src common/src

@@ -4,22 +4,28 @@ import com.taasim.driver.dto.GpsPingRequest;
 import com.taasim.driver.kafka.GpsEventProducer;
 import com.taasim.driver.model.VehiclePosition;
 import com.taasim.driver.repository.VehiclePositionRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
 
 /**
  * Processes incoming GPS pings from drivers.
  *
- * Saves to Cassandra AND publishes to Kafka raw.gps topic.
+ * Saves to Cassandra, publishes to Kafka raw.gps topic, and syncs to Redis Geospatial.
  */
 @Service
 public class LocationService {
 
     private final VehiclePositionRepository repository;
     private final GpsEventProducer gpsEventProducer;
+    private final RestTemplate restTemplate = new RestTemplate();
 
-    // Constructor injection — Spring auto-wires both dependencies
+    @Value("${geospatial.service.url:http://localhost:8084}")
+    private String geospatialServiceUrl;
+
+    // Constructor injection — Spring auto-wires dependencies
     public LocationService(VehiclePositionRepository repository,
                            GpsEventProducer gpsEventProducer) {
         this.repository = repository;
@@ -60,6 +66,17 @@ public class LocationService {
                 request.getSpeed(),
                 Instant.now().toEpochMilli()
         );
+
+        // ── 3. Sync to Redis Geospatial Index ──
+        try {
+            if (geospatialServiceUrl != null && !geospatialServiceUrl.isBlank()) {
+                String url = geospatialServiceUrl + "/internal/drivers/" + request.getDriverId()
+                        + "/position?lat=" + request.getLat() + "&lon=" + request.getLon();
+                restTemplate.put(url, null);
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Geospatial update failed for driver " + request.getDriverId() + ": " + e.getMessage());
+        }
 
         System.out.println("📍 Saved GPS: " + request.getDriverId()
                 + " → Zone " + zoneId

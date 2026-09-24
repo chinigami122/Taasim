@@ -29,3 +29,7 @@ management:
 
 jwt:
   secret: ${JWT_SECRET:dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}
+
+geospatial:
+  service:
+    url: ${GEOSPATIAL_SERVICE_URL:http://localhost:8084}
