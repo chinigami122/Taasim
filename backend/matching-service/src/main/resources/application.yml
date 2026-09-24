@@ -5,13 +5,6 @@ spring:
   application:
     name: matching-service
 
-  cassandra:
-    contact-points: ${CASSANDRA_HOST:localhost}
-    port: ${CASSANDRA_PORT:9042}
-    keyspace-name: ${CASSANDRA_KEYSPACE:taasim}
-    local-datacenter: ${CASSANDRA_DC:datacenter1}
-    schema-action: none
-
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
     consumer:
@@ -27,6 +20,13 @@ spring:
     listener:
       type: single
       missing-topics-fatal: false
+
+geospatial:
+  service:
+    url: ${GEOSPATIAL_SERVICE_URL:http://localhost:8084}
+
+matching:
+  search-radius-meters: ${MATCHING_SEARCH_RADIUS_METERS:5000}
 
 logging:
   level:

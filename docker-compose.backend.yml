@@ -90,12 +90,9 @@ services:
       - "8085:8085"
     environment:
       SERVER_PORT: "8085"
-      CASSANDRA_HOST: cassandra
-      CASSANDRA_PORT: "9042"
-      CASSANDRA_KEYSPACE: taasim
-      CASSANDRA_DC: datacenter1
       KAFKA_BOOTSTRAP: kafka:29092
       KAFKA_CONSUMER_GROUP: matching-service-docker
+      GEOSPATIAL_SERVICE_URL: http://geospatial-service:8084
       LOG_LEVEL_KAFKA: INFO
       JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC"
     deploy:

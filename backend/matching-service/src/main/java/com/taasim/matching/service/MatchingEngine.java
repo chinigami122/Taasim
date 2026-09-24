@@ -1,94 +1,114 @@
 package com.taasim.matching.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taasim.matching.util.GeoUtils;
-import org.springframework.data.cassandra.core.CassandraTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Map;
 
 /**
  * Core matching logic.
- * Finds the nearest available driver to a trip's origin zone.
- *
- * For Slice 5: queries Cassandra vehicle_positions directly.
- * Slice 14 will switch to Redis via the Geospatial Service for faster queries.
+ * Finds the nearest available driver to a trip's pickup origin zone using Redis Geospatial indexing.
  */
 @Service
 public class MatchingEngine {
 
-    private final CassandraTemplate cassandraTemplate;
+    private static final Logger log = LoggerFactory.getLogger(MatchingEngine.class);
 
-    public MatchingEngine(CassandraTemplate cassandraTemplate) {
-        this.cassandraTemplate = cassandraTemplate;
+    private final RestClient restClient;
+    private final ObjectMapper objectMapper;
+    private final String geospatialBaseUrl;
+    private final double searchRadiusMeters;
+
+    @Autowired
+    public MatchingEngine(
+            @Value("${geospatial.service.url:http://localhost:8084}") String geospatialBaseUrl,
+            @Value("${matching.search-radius-meters:5000}") double searchRadiusMeters,
+            ObjectMapper objectMapper
+    ) {
+        this.geospatialBaseUrl = geospatialBaseUrl;
+        this.searchRadiusMeters = searchRadiusMeters;
+        this.objectMapper = objectMapper;
+
+        var requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(2000);
+        requestFactory.setReadTimeout(3000);
+
+        this.restClient = RestClient.builder()
+                .baseUrl(geospatialBaseUrl)
+                .requestFactory(requestFactory)
+                .build();
+    }
+
+    public MatchingEngine(RestClient restClient, ObjectMapper objectMapper, String geospatialBaseUrl, double searchRadiusMeters) {
+        this.restClient = restClient;
+        this.objectMapper = objectMapper;
+        this.geospatialBaseUrl = geospatialBaseUrl;
+        this.searchRadiusMeters = searchRadiusMeters;
     }
 
     /**
-     * Find the nearest driver to a given zone.
+     * Find the nearest available driver to a given zone using Redis Geospatial service.
      *
      * @param originZone the pickup zone ID (1-16)
      * @return a map with driverId, distanceMeters, etaSeconds — or null if no drivers found
      */
     public Map<String, Object> findNearestDriver(int originZone) {
-        // Get the center of the origin zone
         double[] center = GeoUtils.getZoneCenter(originZone);
-        double pickupLat = center[0];
-        double pickupLon = center[1];
+        double lat = center[0];
+        double lon = center[1];
 
-        // Query recent driver positions from Cassandra
-        // We check the origin zone AND neighboring zones
-        List<Map<String, Object>> drivers = cassandraTemplate.getCqlOperations().queryForList(
-                "SELECT taxi_id, lat, lon FROM taasim.vehicle_positions " +
-                        "WHERE city = 'casablanca' AND zone_id = ? LIMIT 50",
-                originZone
-        );
+        try {
+            String response = restClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/internal/drivers/nearby")
+                            .queryParam("lat", lat)
+                            .queryParam("lon", lon)
+                            .queryParam("radius", searchRadiusMeters)
+                            .build())
+                    .retrieve()
+                    .body(String.class);
 
-        // If no drivers in the exact zone, check nearby zones
-        if (drivers.isEmpty()) {
-            for (int delta : new int[]{-1, 1, -4, 4}) {
-                int neighborZone = originZone + delta;
-                if (neighborZone >= 1 && neighborZone <= 16) {
-                    drivers = cassandraTemplate.getCqlOperations().queryForList(
-                            "SELECT taxi_id, lat, lon FROM taasim.vehicle_positions " +
-                                    "WHERE city = 'casablanca' AND zone_id = ? LIMIT 50",
-                            neighborZone
-                    );
-                    if (!drivers.isEmpty()) break;
-                }
+            if (response == null || response.isBlank()) {
+                log.warn("❌ Empty response from geospatial service for zone {}", originZone);
+                return null;
             }
-        }
 
-        if (drivers.isEmpty()) {
-            System.out.println("❌ No drivers found near zone " + originZone);
+            List<Map<String, Object>> drivers = objectMapper.readValue(
+                    response,
+                    new TypeReference<>() {}
+            );
+
+            if (drivers == null || drivers.isEmpty()) {
+                log.info("ℹ️ No drivers found near zone {} within {}m", originZone, (int) searchRadiusMeters);
+                return null;
+            }
+
+            // Results from Redis GEO are already sorted ascending by proximity
+            Map<String, Object> closest = drivers.get(0);
+            String driverId = (String) closest.get("driverId");
+            double distanceMeters = ((Number) closest.get("distanceMeters")).doubleValue();
+            int eta = GeoUtils.computeEta(distanceMeters);
+
+            log.info("✅ Matched via Redis: {} | Distance: {}m | ETA: {}s",
+                    driverId, (int) distanceMeters, eta);
+
+            return Map.of(
+                    "driverId", driverId,
+                    "distanceMeters", distanceMeters,
+                    "etaSeconds", eta
+            );
+        } catch (Exception e) {
+            log.error("❌ Failed to query geospatial service at {}: {}", geospatialBaseUrl, e.getMessage());
             return null;
         }
-
-        // Find the closest driver (Haversine)
-        String bestDriverId = null;
-        double bestDistance = Double.MAX_VALUE;
-
-        for (Map<String, Object> driver : drivers) {
-            String driverId = (String) driver.get("taxi_id");
-            double driverLat = (double) driver.get("lat");
-            double driverLon = (double) driver.get("lon");
-
-            double distance = GeoUtils.haversine(pickupLat, pickupLon, driverLat, driverLon);
-            if (distance < bestDistance) {
-                bestDistance = distance;
-                bestDriverId = driverId;
-            }
-        }
-
-        int eta = GeoUtils.computeEta(bestDistance);
-
-        System.out.println("✅ Matched: " + bestDriverId
-                + " | Distance: " + (int) bestDistance + "m"
-                + " | ETA: " + eta + "s");
-
-        return Map.of(
-                "driverId", bestDriverId,
-                "distanceMeters", bestDistance,
-                "etaSeconds", eta
-        );
     }
 }
