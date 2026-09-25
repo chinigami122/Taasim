@@ -1,5 +1,6 @@
 package com.taasim.trip.service;
 
+import com.taasim.common.util.GeoUtils;
 import com.taasim.trip.dto.TripRequestDto;
 import com.taasim.trip.kafka.TripEventProducer;
 import com.taasim.trip.model.Trip;
@@ -31,7 +32,7 @@ public class TripService {
 
     /**
      * Create a new trip request.
-     * 1. Generate a unique trip ID
+     * 1. Determine origin & destination zones (from explicit zone or derived from GPS)
      * 2. Save to Cassandra with status REQUESTED
      * 3. Publish to Kafka raw.trips
      */
@@ -42,14 +43,17 @@ public class TripService {
                 .withZone(ZoneOffset.UTC)
                 .format(now);
 
+        int originZone = resolveOriginZone(request);
+        int destZone = resolveDestinationZone(request);
+
         Trip trip = new Trip();
         trip.setCity("casablanca");
         trip.setDateBucket(dateBucket);
         trip.setCreatedAt(now);
         trip.setTripId(tripId);
         trip.setRiderId(request.getRiderId());
-        trip.setOriginZone(request.getOriginZone());
-        trip.setDestZone(request.getDestinationZone());
+        trip.setOriginZone(originZone);
+        trip.setDestZone(destZone);
         trip.setStatus("REQUESTED");
 
         // Save to Cassandra
@@ -57,16 +61,46 @@ public class TripService {
 
         tripCache.put(tripId, trip);
 
-        // Publish to Kafka
-        tripEventProducer.send(tripId, request.getRiderId(),
-                request.getOriginZone(), request.getDestinationZone(),
-                now.toEpochMilli());
+        // Publish to Kafka with both coordinates and zones
+        tripEventProducer.send(
+                tripId,
+                request.getRiderId(),
+                originZone,
+                destZone,
+                request.getOriginLat(),
+                request.getOriginLon(),
+                request.getDestinationLat(),
+                request.getDestinationLon(),
+                now.toEpochMilli()
+        );
 
-        System.out.println("🚕 Trip created: " + tripId + " | "
-                + request.getOriginZone() + " → " + request.getDestinationZone());
+        System.out.println("🚕 Trip created: " + tripId + " | Zone "
+                + originZone + " → Zone " + destZone
+                + (request.getOriginLat() != null ? " (GPS: " + request.getOriginLat() + ", " + request.getOriginLon() + ")" : ""));
 
         return trip;
     }
+
+    private int resolveOriginZone(TripRequestDto request) {
+        if (request.getOriginZone() != null && request.getOriginZone() >= 1 && request.getOriginZone() <= 16) {
+            return request.getOriginZone();
+        }
+        if (request.getOriginLat() != null && request.getOriginLon() != null) {
+            return GeoUtils.calculateZoneId(request.getOriginLat(), request.getOriginLon());
+        }
+        return 1;
+    }
+
+    private int resolveDestinationZone(TripRequestDto request) {
+        if (request.getDestinationZone() != null && request.getDestinationZone() >= 1 && request.getDestinationZone() <= 16) {
+            return request.getDestinationZone();
+        }
+        if (request.getDestinationLat() != null && request.getDestinationLon() != null) {
+            return GeoUtils.calculateZoneId(request.getDestinationLat(), request.getDestinationLon());
+        }
+        return 1;
+    }
+
     /**
      * Update trip to MATCHED status with the assigned driver.
      * Uses CQL directly because the primary key is composite.
@@ -90,6 +124,7 @@ public class TripService {
 
         System.out.println("✅ Trip " + tripId + " → MATCHED");
     }
+
     public void updateTripStatus(String tripId, String newStatus) {
         Trip trip = tripCache.get(tripId);
         if (trip == null) {

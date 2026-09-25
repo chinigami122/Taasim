@@ -28,11 +28,14 @@ public class TripRequestConsumer {
         try {
             JsonNode json = objectMapper.readTree(message);
             String tripId = json.get("trip_id").asText();
-            int originZone = json.get("origin_zone").asInt();
-            int destinationZone = json.get("destination_zone").asInt();
+            int originZone = json.has("origin_zone") ? json.get("origin_zone").asInt() : 1;
+            int destinationZone = json.has("destination_zone") ? json.get("destination_zone").asInt() : 1;
 
-            // Find nearest driver
-            Map<String, Object> match = matchingEngine.findNearestDriver(originZone);
+            Double originLat = json.hasNonNull("origin_lat") ? json.get("origin_lat").asDouble() : null;
+            Double originLon = json.hasNonNull("origin_lon") ? json.get("origin_lon").asDouble() : null;
+
+            // Find nearest driver prioritizing exact GPS coordinates with zone fallback
+            Map<String, Object> match = matchingEngine.findNearestDriver(originLat, originLon, originZone);
 
             if (match != null) {
                 matchEventProducer.send(

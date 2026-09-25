@@ -1,35 +1,65 @@
 package com.taasim.driver.service;
 
+import com.taasim.common.util.GeoUtils;
 import com.taasim.driver.dto.GpsPingRequest;
 import com.taasim.driver.kafka.GpsEventProducer;
 import com.taasim.driver.model.VehiclePosition;
 import com.taasim.driver.repository.VehiclePositionRepository;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
 
 /**
  * Processes incoming GPS pings from drivers.
  *
- * Saves to Cassandra, publishes to Kafka raw.gps topic, and syncs to Redis Geospatial.
+ * Saves to Cassandra, publishes to Kafka raw.gps topic, and syncs to Redis Geospatial
+ * protected by a Resilience4j circuit breaker.
  */
 @Service
 public class LocationService {
 
+    private static final Logger log = LoggerFactory.getLogger(LocationService.class);
+
     private final VehiclePositionRepository repository;
     private final GpsEventProducer gpsEventProducer;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestClient restClient;
+    private final String geospatialServiceUrl;
 
-    @Value("${geospatial.service.url:http://localhost:8084}")
-    private String geospatialServiceUrl;
-
-    // Constructor injection — Spring auto-wires dependencies
-    public LocationService(VehiclePositionRepository repository,
-                           GpsEventProducer gpsEventProducer) {
+    @Autowired
+    public LocationService(
+            VehiclePositionRepository repository,
+            GpsEventProducer gpsEventProducer,
+            @Value("${geospatial.service.url:http://localhost:8084}") String geospatialServiceUrl
+    ) {
         this.repository = repository;
         this.gpsEventProducer = gpsEventProducer;
+        this.geospatialServiceUrl = geospatialServiceUrl;
+
+        var factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(1000);
+        factory.setReadTimeout(1500);
+
+        this.restClient = RestClient.builder()
+                .baseUrl(geospatialServiceUrl)
+                .requestFactory(factory)
+                .build();
+    }
+
+    public LocationService(VehiclePositionRepository repository,
+                           GpsEventProducer gpsEventProducer,
+                           RestClient restClient,
+                           String geospatialServiceUrl) {
+        this.repository = repository;
+        this.gpsEventProducer = gpsEventProducer;
+        this.restClient = restClient;
+        this.geospatialServiceUrl = geospatialServiceUrl;
     }
 
     /**
@@ -38,10 +68,10 @@ public class LocationService {
      * 1. Determine which zone the driver is in
      * 2. Save to Cassandra vehicle_positions table
      * 3. Publish to Kafka raw.gps topic
+     * 4. Sync to Redis Geospatial index (Circuit breaker protected)
      */
     public VehiclePosition processGpsPing(GpsPingRequest request) {
-
-        int zoneId = calculateZoneId(request.getLat(), request.getLon());
+        int zoneId = GeoUtils.calculateZoneId(request.getLat(), request.getLon());
         String zoneName = "Zone-" + zoneId;
 
         VehiclePosition position = new VehiclePosition();
@@ -68,15 +98,7 @@ public class LocationService {
         );
 
         // ── 3. Sync to Redis Geospatial Index ──
-        try {
-            if (geospatialServiceUrl != null && !geospatialServiceUrl.isBlank()) {
-                String url = geospatialServiceUrl + "/internal/drivers/" + request.getDriverId()
-                        + "/position?lat=" + request.getLat() + "&lon=" + request.getLon();
-                restTemplate.put(url, null);
-            }
-        } catch (Exception e) {
-            System.err.println("⚠️ Geospatial update failed for driver " + request.getDriverId() + ": " + e.getMessage());
-        }
+        syncToGeospatial(request.getDriverId(), request.getLat(), request.getLon());
 
         System.out.println("📍 Saved GPS: " + request.getDriverId()
                 + " → Zone " + zoneId
@@ -85,13 +107,21 @@ public class LocationService {
         return position;
     }
 
-    private int calculateZoneId(double lat, double lon) {
-        double LON_MIN = -7.6895, LON_MAX = -7.4008;
-        double LAT_MIN = 33.5072, LAT_MAX = 33.6527;
-        int gridX = (int) (4 * (lon - LON_MIN) / (LON_MAX - LON_MIN));
-        int gridY = (int) (4 * (lat - LAT_MIN) / (LAT_MAX - LAT_MIN));
-        gridX = Math.max(0, Math.min(3, gridX));
-        gridY = Math.max(0, Math.min(3, gridY));
-        return (gridY * 4) + gridX + 1;
+    @CircuitBreaker(name = "geospatial-write", fallbackMethod = "fallbackGeospatialSync")
+    public void syncToGeospatial(String driverId, double lat, double lon) {
+        if (geospatialServiceUrl != null && !geospatialServiceUrl.isBlank()) {
+            restClient.put()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/internal/drivers/{driverId}/position")
+                            .queryParam("lat", lat)
+                            .queryParam("lon", lon)
+                            .build(driverId))
+                    .retrieve()
+                    .toBodilessEntity();
+        }
+    }
+
+    public void fallbackGeospatialSync(String driverId, double lat, double lon, Throwable t) {
+        log.warn("⚠️ Geospatial sync circuit open/failed for driver {}: {}", driverId, t.getMessage());
     }
 }

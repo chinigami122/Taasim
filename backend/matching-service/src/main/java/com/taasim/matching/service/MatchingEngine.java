@@ -2,7 +2,9 @@ package com.taasim.matching.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.taasim.matching.util.GeoUtils;
+import com.taasim.common.util.GeoUtils;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,7 +18,8 @@ import java.util.Map;
 
 /**
  * Core matching logic.
- * Finds the nearest available driver to a trip's pickup origin zone using Redis Geospatial indexing.
+ * Finds the nearest available driver to a trip's pickup location using Redis Geospatial indexing,
+ * protected with Resilience4j CircuitBreaker and Retry mechanisms.
  */
 @Service
 public class MatchingEngine {
@@ -39,8 +42,8 @@ public class MatchingEngine {
         this.objectMapper = objectMapper;
 
         var requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(2000);
-        requestFactory.setReadTimeout(3000);
+        requestFactory.setConnectTimeout(1500);
+        requestFactory.setReadTimeout(2000);
 
         this.restClient = RestClient.builder()
                 .baseUrl(geospatialBaseUrl)
@@ -56,39 +59,58 @@ public class MatchingEngine {
     }
 
     /**
-     * Find the nearest available driver to a given zone using Redis Geospatial service.
-     *
-     * @param originZone the pickup zone ID (1-16)
-     * @return a map with driverId, distanceMeters, etaSeconds — or null if no drivers found
+     * Overloaded method for backward compatibility with zone-only calls.
      */
     public Map<String, Object> findNearestDriver(int originZone) {
-        double[] center = GeoUtils.getZoneCenter(originZone);
-        double lat = center[0];
-        double lon = center[1];
+        return findNearestDriver(null, null, originZone);
+    }
+
+    /**
+     * Find the nearest available driver to exact coordinates or zone center using Redis Geospatial.
+     * Decorated with Resilience4j Circuit Breaker & Retry.
+     */
+    @CircuitBreaker(name = "geospatial", fallbackMethod = "fallbackNearestDriver")
+    @Retry(name = "geospatial")
+    public Map<String, Object> findNearestDriver(Double originLat, Double originLon, Integer originZone) {
+        double pickupLat;
+        double pickupLon;
+
+        if (originLat != null && originLon != null) {
+            pickupLat = originLat;
+            pickupLon = originLon;
+        } else if (originZone != null && originZone >= 1 && originZone <= 16) {
+            double[] center = GeoUtils.getZoneCenter(originZone);
+            pickupLat = center[0];
+            pickupLon = center[1];
+        } else {
+            double[] center = GeoUtils.getZoneCenter(1);
+            pickupLat = center[0];
+            pickupLon = center[1];
+        }
+
+        String response = restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/internal/drivers/nearby")
+                        .queryParam("lat", pickupLat)
+                        .queryParam("lon", pickupLon)
+                        .queryParam("radius", searchRadiusMeters)
+                        .build())
+                .retrieve()
+                .body(String.class);
+
+        if (response == null || response.isBlank()) {
+            log.warn("❌ Empty response from geospatial service for coordinates ({}, {})", pickupLat, pickupLon);
+            return null;
+        }
 
         try {
-            String response = restClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/internal/drivers/nearby")
-                            .queryParam("lat", lat)
-                            .queryParam("lon", lon)
-                            .queryParam("radius", searchRadiusMeters)
-                            .build())
-                    .retrieve()
-                    .body(String.class);
-
-            if (response == null || response.isBlank()) {
-                log.warn("❌ Empty response from geospatial service for zone {}", originZone);
-                return null;
-            }
-
             List<Map<String, Object>> drivers = objectMapper.readValue(
                     response,
                     new TypeReference<>() {}
             );
 
             if (drivers == null || drivers.isEmpty()) {
-                log.info("ℹ️ No drivers found near zone {} within {}m", originZone, (int) searchRadiusMeters);
+                log.info("ℹ️ No drivers found near ({}, {}) within {}m", pickupLat, pickupLon, (int) searchRadiusMeters);
                 return null;
             }
 
@@ -107,8 +129,16 @@ public class MatchingEngine {
                     "etaSeconds", eta
             );
         } catch (Exception e) {
-            log.error("❌ Failed to query geospatial service at {}: {}", geospatialBaseUrl, e.getMessage());
-            return null;
+            log.error("❌ Failed to parse geospatial response: {}", e.getMessage());
+            throw new RuntimeException("Geospatial parsing error", e);
         }
+    }
+
+    /**
+     * Fallback method executed when the circuit is OPEN or retries are exhausted.
+     */
+    public Map<String, Object> fallbackNearestDriver(Double originLat, Double originLon, Integer originZone, Throwable t) {
+        log.warn("⚠️ Geospatial service fallback triggered! Reason: {}", t.getMessage());
+        return null;
     }
 }

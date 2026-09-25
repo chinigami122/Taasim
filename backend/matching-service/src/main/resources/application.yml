@@ -28,6 +28,25 @@ geospatial:
 matching:
   search-radius-meters: ${MATCHING_SEARCH_RADIUS_METERS:5000}
 
+resilience4j:
+  circuitbreaker:
+    instances:
+      geospatial:
+        register-health-indicator: true
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 15s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+
+  retry:
+    instances:
+      geospatial:
+        max-attempts: 3
+        wait-duration: 150ms
+        exponential-backoff-multiplier: 2
+
 logging:
   level:
     org.springframework.kafka: ${LOG_LEVEL_KAFKA:DEBUG}
@@ -37,4 +56,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: ${MANAGEMENT_ENDPOINTS:health,info,metrics}
+        include: health,info,metrics,circuitbreakers,circuitbreakerevents
+  health:
+    circuitbreakers:
+      enabled: true
+  endpoint:
+    health:
+      show-details: always

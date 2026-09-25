@@ -3,15 +3,13 @@ package com.taasim.trip.kafka;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
  * Publishes trip request events to Kafka "raw.trips".
  *
- * The existing Flink Job 3 (trip_matcher_job.py) and the
- * matching-service (Slice 4+) consume from this topic.
- *
- * JSON schema matches the Python trip_request_producer.py format.
+ * Forwards origin/destination zones and exact coordinates when available.
  */
 @Component
 public class TripEventProducer {
@@ -24,24 +22,29 @@ public class TripEventProducer {
         this.kafkaTemplate = kafkaTemplate;
     }
 
-    public void send(String tripId, String riderId, int originZone,
-                     int destinationZone, long requestedAt) {
-        Map<String, Object> event = Map.of(
-                "trip_id", tripId,
-                "rider_id", riderId,
-                "origin_zone", originZone,
-                "destination_zone", destinationZone,
-                "requested_at", requestedAt,
-                "call_type", "A"   // Central booking (same as existing Python producer)
-        );
+    public void send(String tripId, String riderId, int originZone, int destinationZone,
+                     Double originLat, Double originLon, Double destLat, Double destLon,
+                     long requestedAt) {
+        Map<String, Object> event = new HashMap<>();
+        event.put("trip_id", tripId);
+        event.put("rider_id", riderId);
+        event.put("origin_zone", originZone);
+        event.put("destination_zone", destinationZone);
+        event.put("requested_at", requestedAt);
+        event.put("call_type", "A");
+
+        if (originLat != null) event.put("origin_lat", originLat);
+        if (originLon != null) event.put("origin_lon", originLon);
+        if (destLat != null) event.put("dest_lat", destLat);
+        if (destLon != null) event.put("dest_lon", destLon);
 
         kafkaTemplate.send(TOPIC, String.valueOf(originZone), event).whenComplete((result, ex) -> {
             if (ex != null) {
                 System.err.println("❌ Kafka send error (raw.trips): " + ex.getMessage());
                 ex.printStackTrace();
             } else {
-                System.out.println("✅ Kafka send success (raw.trips) to partition " 
-                        + result.getRecordMetadata().partition() 
+                System.out.println("✅ Kafka send success (raw.trips) to partition "
+                        + result.getRecordMetadata().partition()
                         + " @ offset " + result.getRecordMetadata().offset());
             }
         });

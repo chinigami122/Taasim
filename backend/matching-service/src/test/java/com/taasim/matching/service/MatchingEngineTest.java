@@ -31,11 +31,30 @@ class MatchingEngineTest {
     }
 
     @Test
-    void findNearestDriver_returnsClosestDriver() {
+    void findNearestDriver_withExactCoordinates_queriesRedisAndReturnsClosest() {
         String mockResponse = """
             [
-                {"driverId":"taxi_001","distanceMeters":320.5,"lat":33.5731,"lon":-7.5898},
-                {"driverId":"taxi_002","distanceMeters":890.0,"lat":33.5800,"lon":-7.5900}
+                {"driverId":"taxi_gps_1","distanceMeters":150.0,"lat":33.5740,"lon":-7.5890}
+            ]
+            """;
+
+        server.expect(requestTo(startsWith("http://localhost:8084/internal/drivers/nearby?lat=33.5735&lon=-7.5895")))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
+
+        Map<String, Object> result = matchingEngine.findNearestDriver(33.5735, -7.5895, 5);
+
+        assertThat(result).isNotNull();
+        assertThat(result.get("driverId")).isEqualTo("taxi_gps_1");
+        assertThat(result.get("distanceMeters")).isEqualTo(150.0);
+        server.verify();
+    }
+
+    @Test
+    void findNearestDriver_zoneOnlyFallback_queriesZoneCenter() {
+        String mockResponse = """
+            [
+                {"driverId":"taxi_001","distanceMeters":320.5,"lat":33.5731,"lon":-7.5898}
             ]
             """;
 
@@ -48,7 +67,6 @@ class MatchingEngineTest {
         assertThat(result).isNotNull();
         assertThat(result.get("driverId")).isEqualTo("taxi_001");
         assertThat(result.get("distanceMeters")).isEqualTo(320.5);
-        assertThat(result.get("etaSeconds")).isNotNull();
         server.verify();
     }
 
@@ -65,14 +83,20 @@ class MatchingEngineTest {
     }
 
     @Test
-    void findNearestDriver_serverError_returnsNullGracefully() {
+    void findNearestDriver_serverError_throwsExceptionForCircuitBreaker() {
         server.expect(requestTo(startsWith("http://localhost:8084/internal/drivers/nearby")))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withServerError());
 
-        Map<String, Object> result = matchingEngine.findNearestDriver(5);
-
-        assertThat(result).isNull();
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.client.HttpServerErrorException.class, () -> {
+            matchingEngine.findNearestDriver(5);
+        });
         server.verify();
+    }
+
+    @Test
+    void fallbackNearestDriver_returnsNullGracefully() {
+        Map<String, Object> fallback = matchingEngine.fallbackNearestDriver(33.5735, -7.5895, 5, new RuntimeException("Service down"));
+        assertThat(fallback).isNull();
     }
 }
