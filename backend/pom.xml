@@ -51,6 +51,6 @@
         <module>trip-service</module>
         <module>matching-service</module>
         <module>geospatial-service</module>
-<!--        <module>billing-service</module>-->
+        <module>billing-service</module>
     </modules>
 </project>

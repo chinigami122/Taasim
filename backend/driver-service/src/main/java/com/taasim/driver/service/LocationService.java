@@ -29,6 +29,7 @@ public class LocationService {
 
     private final VehiclePositionRepository repository;
     private final GpsEventProducer gpsEventProducer;
+    private final DriverService driverService;
     private final RestClient restClient;
     private final String geospatialServiceUrl;
 
@@ -36,10 +37,12 @@ public class LocationService {
     public LocationService(
             VehiclePositionRepository repository,
             GpsEventProducer gpsEventProducer,
+            DriverService driverService,
             @Value("${geospatial.service.url:http://localhost:8084}") String geospatialServiceUrl
     ) {
         this.repository = repository;
         this.gpsEventProducer = gpsEventProducer;
+        this.driverService = driverService;
         this.geospatialServiceUrl = geospatialServiceUrl;
 
         var factory = new SimpleClientHttpRequestFactory();
@@ -54,10 +57,12 @@ public class LocationService {
 
     public LocationService(VehiclePositionRepository repository,
                            GpsEventProducer gpsEventProducer,
+                           DriverService driverService,
                            RestClient restClient,
                            String geospatialServiceUrl) {
         this.repository = repository;
         this.gpsEventProducer = gpsEventProducer;
+        this.driverService = driverService;
         this.restClient = restClient;
         this.geospatialServiceUrl = geospatialServiceUrl;
     }
@@ -99,6 +104,11 @@ public class LocationService {
 
         // ── 3. Sync to Redis Geospatial Index ──
         syncToGeospatial(request.getDriverId(), request.getLat(), request.getLon());
+
+        // ── 4. Track Ride Distance in DriverService if ride is in progress ──
+        if (driverService != null) {
+            driverService.recordGpsMovement(request.getDriverId(), request.getLat(), request.getLon());
+        }
 
         System.out.println("📍 Saved GPS: " + request.getDriverId()
                 + " → Zone " + zoneId

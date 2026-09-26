@@ -11,13 +11,14 @@ COPY trip-service/pom.xml trip-service/
 COPY matching-service/pom.xml matching-service/
 COPY gateway-service/pom.xml gateway-service/
 COPY geospatial-service/pom.xml geospatial-service/
+COPY billing-service/pom.xml billing-service/
 
 # Copy sources for common and gateway-service
 COPY common/src common/src
 COPY gateway-service/src gateway-service/src
 
 # Build package
-RUN mvn -pl gateway-service -am clean package -DskipTests -B
+RUN mvn -pl gateway-service -am clean package -Dmaven.test.skip=true -B
 
 # ---- Runtime stage ----
 FROM eclipse-temurin:21-jre-alpine

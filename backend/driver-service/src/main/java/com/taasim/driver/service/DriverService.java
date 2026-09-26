@@ -1,9 +1,12 @@
 package com.taasim.driver.service;
 
+import com.taasim.common.util.GeoUtils;
 import com.taasim.driver.kafka.TripCompletedProducer;
 import com.taasim.driver.kafka.TripStatusProducer;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -25,6 +28,18 @@ public class DriverService {
     // In-memory: driverId → availability status
     private final Map<String, String> driverStatus = new ConcurrentHashMap<>();
 
+    // In-memory: tripId → start Instant
+    private final Map<String, Instant> tripStartTimes = new ConcurrentHashMap<>();
+
+    // In-memory: tripId → accumulated distance in km
+    private final Map<String, Double> tripDistances = new ConcurrentHashMap<>();
+
+    // In-memory: driverId → [lat, lon]
+    private final Map<String, double[]> lastPositions = new ConcurrentHashMap<>();
+
+    // In-memory: tripId → clientId
+    private final Map<String, String> tripClients = new ConcurrentHashMap<>();
+
     public DriverService(TripStatusProducer tripStatusProducer,
                          TripCompletedProducer tripCompletedProducer) {
         this.tripStatusProducer = tripStatusProducer;
@@ -35,6 +50,13 @@ public class DriverService {
     public void assignTrip(String driverId, String tripId, int etaSeconds) {
         pendingTrips.put(driverId, tripId);
         System.out.println("📋 Driver " + driverId + " has pending trip: " + tripId);
+    }
+
+    /** Record client ID associated with a trip */
+    public void registerTripClient(String tripId, String clientId) {
+        if (clientId != null && !clientId.isBlank()) {
+            tripClients.put(tripId, clientId);
+        }
     }
 
     /** Driver accepts the pending trip */
@@ -86,9 +108,24 @@ public class DriverService {
             return false;
         }
 
+        tripStartTimes.put(tripId, Instant.now());
+        tripDistances.put(tripId, 0.0);
+
         tripStatusProducer.send(tripId, driverId, "IN_PROGRESS");
         System.out.println("🚗 Driver " + driverId + " started ride for trip " + tripId);
         return true;
+    }
+
+    /** Track incremental distance for an active trip from GPS telemetry */
+    public void recordGpsMovement(String driverId, double lat, double lon) {
+        String tripId = activeTrips.get(driverId);
+        double[] previous = lastPositions.put(driverId, new double[]{lat, lon});
+
+        if (tripId != null && tripStartTimes.containsKey(tripId) && previous != null) {
+            double deltaMeters = GeoUtils.haversineMeters(previous[0], previous[1], lat, lon);
+            double deltaKm = deltaMeters / 1000.0;
+            tripDistances.compute(tripId, (k, current) -> (current == null ? 0.0 : current) + deltaKm);
+        }
     }
 
     /** Driver completes the ride (arrived at destination) */
@@ -101,13 +138,32 @@ public class DriverService {
 
         driverStatus.put(driverId, "AVAILABLE");
 
+        Instant start = tripStartTimes.remove(tripId);
+        Double distanceKm = tripDistances.remove(tripId);
+        String clientId = tripClients.remove(tripId);
+
+        double durationMin = (start != null)
+                ? Duration.between(start, Instant.now()).toMillis() / 60000.0
+                : 5.0;
+        double finalDistKm = (distanceKm != null && distanceKm > 0.0)
+                ? distanceKm
+                : 5.0;
+
         // Send status change
         tripStatusProducer.send(tripId, driverId, "COMPLETED");
 
-        // Send trip.completed event (for billing service in Slice 15)
-        tripCompletedProducer.send(tripId, driverId);
+        // Send trip.completed event with real metrics for billing-service
+        tripCompletedProducer.send(
+                tripId,
+                driverId,
+                clientId != null ? clientId : "unknown",
+                Math.round(finalDistKm * 1000.0) / 1000.0,
+                Math.round(durationMin * 100.0) / 100.0,
+                1.0
+        );
 
-        System.out.println("🏁 Driver " + driverId + " completed trip " + tripId);
+        System.out.println("🏁 Driver " + driverId + " completed trip " + tripId +
+                " [Dist: " + finalDistKm + " km, Duration: " + durationMin + " min]");
         return true;
     }
 }

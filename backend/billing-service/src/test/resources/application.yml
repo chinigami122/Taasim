@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: billing-service
+  datasource:
+    url: jdbc:h2:mem:billing_test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: billing-test
+
+billing:
+  fare:
+    base: 5.00
+    per-km: 3.50
+    per-minute: 0.50
+    surge-min: 1.0
+    surge-max: 2.5
+    commission-rate: 0.15

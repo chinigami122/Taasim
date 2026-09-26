@@ -27,6 +27,10 @@ public final class GeoUtils {
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
+    public static double haversineMeters(double lat1, double lon1, double lat2, double lon2) {
+        return haversine(lat1, lon1, lat2, lon2);
+    }
+
     /**
      * Estimate ETA in seconds based on distance.
      * Assumes average speed of 30 km/h in city traffic.

@@ -127,6 +127,35 @@ services:
       - taasim-net
     restart: unless-stopped
 
+  billing-service:
+    build:
+      context: ./backend
+      dockerfile: billing-service/Dockerfile
+    image: taasim/billing-service:local
+    container_name: taasim-billing
+    env_file: .env
+    ports:
+      - "8086:8086"
+    environment:
+      SERVER_PORT: "8086"
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: taasim
+      POSTGRES_USER: taasim
+      POSTGRES_PASSWORD: taasim
+      KAFKA_BOOTSTRAP: kafka:29092
+      KAFKA_CONSUMER_GROUP: billing-service-docker
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 384M
+    networks:
+      - taasim-net
+    restart: unless-stopped
+
   gateway-service:
     build:
       context: ./backend
@@ -142,6 +171,7 @@ services:
       TRIP_SERVICE_URI: http://trip-service:8082
       DRIVER_SERVICE_URI: http://driver-service:8083
       GEO_SERVICE_URI: http://geospatial-service:8084
+      BILLING_SERVICE_URI: http://billing-service:8086
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC"

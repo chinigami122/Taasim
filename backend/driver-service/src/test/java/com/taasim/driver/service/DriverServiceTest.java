@@ -72,7 +72,31 @@ class DriverServiceTest {
         assertThat(driverService.getDriverStatus("taxi_001")).isEqualTo("AVAILABLE");
 
         verify(tripStatusProducer).send("trip-100", "taxi_001", "COMPLETED");
-        verify(tripCompletedProducer).send("trip-100", "taxi_001");
+        verify(tripCompletedProducer).send(eq("trip-100"), eq("taxi_001"), anyString(), anyDouble(), anyDouble(), anyDouble());
+    }
+
+    @Test
+    void completeRide_withGpsMovement_calculatesAccumulatedDistance() {
+        driverService.assignTrip("taxi_001", "trip-100", 120);
+        driverService.acceptTrip("taxi_001");
+        driverService.startRide("taxi_001");
+
+        // First GPS ping at start
+        driverService.recordGpsMovement("taxi_001", 33.5735, -7.5895);
+        // Second GPS ping moved north
+        driverService.recordGpsMovement("taxi_001", 33.5835, -7.5895);
+
+        boolean result = driverService.completeRide("taxi_001");
+
+        assertThat(result).isTrue();
+        verify(tripCompletedProducer).send(
+                eq("trip-100"),
+                eq("taxi_001"),
+                anyString(),
+                doubleThat(d -> d > 1.0 && d < 1.3), // ~1.11 km
+                anyDouble(),
+                eq(1.0)
+        );
     }
 
     @Test
