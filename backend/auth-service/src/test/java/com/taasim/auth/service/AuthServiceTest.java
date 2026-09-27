@@ -29,6 +29,9 @@ class AuthServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private StripeCustomerService stripeCustomerService;
+
     private JwtTokenProvider jwtTokenProvider;
     private AuthService authService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
@@ -39,7 +42,7 @@ class AuthServiceTest {
                 "dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234",
                 86400000
         );
-        authService = new AuthService(userRepository, jwtTokenProvider);
+        authService = new AuthService(userRepository, jwtTokenProvider, stripeCustomerService);
     }
 
     @Test

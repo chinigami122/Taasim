@@ -28,6 +28,9 @@ public class TripRequestConsumer {
         try {
             JsonNode json = objectMapper.readTree(message);
             String tripId = json.get("trip_id").asText();
+            String riderId = json.has("rider_id") ? json.get("rider_id").asText()
+                    : (json.has("client_id") ? json.get("client_id").asText() : "");
+
             int originZone = json.has("origin_zone") ? json.get("origin_zone").asInt() : 1;
             int destinationZone = json.has("destination_zone") ? json.get("destination_zone").asInt() : 1;
 
@@ -41,6 +44,7 @@ public class TripRequestConsumer {
                 matchEventProducer.send(
                         tripId,
                         (String) match.get("driverId"),
+                        riderId,
                         (double) match.get("distanceMeters"),
                         (int) match.get("etaSeconds"),
                         originZone,

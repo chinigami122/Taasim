@@ -30,6 +30,14 @@ jwt:
   secret: ${JWT_SECRET:dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}
   expiration: ${JWT_EXPIRATION_MS:86400000}    # 24 hours in milliseconds
 
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY:sk_test_placeholder_change_me}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_placeholder}
+  currency: ${STRIPE_CURRENCY:mad}
+
+auth-service:
+  internal-base-url: ${AUTH_SERVICE_URL:http://localhost:8081}
+
 management:
   endpoints:
     web:

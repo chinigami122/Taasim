@@ -22,6 +22,8 @@ public class JwtGatewayFilter implements WebFilter {
     private static final List<String> PUBLIC_PATHS = List.of(
             "/api/auth/register",
             "/api/auth/login",
+            "/api/billing/stripe",
+            "/api/internal",
             "/actuator",
             "/v3/api-docs",
             "/swagger-ui",

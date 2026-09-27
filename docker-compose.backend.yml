@@ -146,6 +146,7 @@ services:
       POSTGRES_PASSWORD: taasim
       KAFKA_BOOTSTRAP: kafka:29092
       KAFKA_CONSUMER_GROUP: billing-service-docker
+      AUTH_SERVICE_URL: http://auth-service:8081
       JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC"
     deploy:
       resources:

@@ -28,8 +28,14 @@ public class MatchEventConsumer {
             String driverId = json.get("driver_id").asText();
             int etaSeconds = json.get("eta_seconds").asInt();
 
+            String clientId = json.has("rider_id") ? json.get("rider_id").asText()
+                    : (json.has("client_id") ? json.get("client_id").asText() : "");
+
             driverService.assignTrip(driverId, tripId, etaSeconds);
-            System.out.println("📥 Trip assigned to driver " + driverId + ": " + tripId);
+            if (!clientId.isBlank()) {
+                driverService.registerTripClient(tripId, clientId);
+            }
+            System.out.println("📥 Trip assigned to driver " + driverId + ": " + tripId + " (client=" + clientId + ")");
         } catch (Exception e) {
             System.err.println("❌ Failed to process match: " + e.getMessage());
         }

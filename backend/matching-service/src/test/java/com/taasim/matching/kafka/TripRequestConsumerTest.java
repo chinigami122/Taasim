@@ -14,7 +14,7 @@ class TripRequestConsumerTest {
         TripRequestConsumer consumer = new TripRequestConsumer(matchingEngine, matchEventProducer);
 
         String payload = """
-            {"trip_id":"trip-123","origin_zone":5,"destination_zone":12,"origin_lat":33.5735,"origin_lon":-7.5895}
+            {"trip_id":"trip-123","origin_zone":5,"destination_zone":12,"origin_lat":33.5735,"origin_lon":-7.5895,"rider_id":"rider-456"}
             """;
 
         when(matchingEngine.findNearestDriver(33.5735, -7.5895, 5)).thenReturn(Map.of(
@@ -26,7 +26,7 @@ class TripRequestConsumerTest {
         consumer.onTripRequest(payload);
 
         verify(matchingEngine).findNearestDriver(33.5735, -7.5895, 5);
-        verify(matchEventProducer).send("trip-123", "taxi_001", 1200.5, 300, 5, 12);
+        verify(matchEventProducer).send("trip-123", "taxi_001", "rider-456", 1200.5, 300, 5, 12);
     }
 
     @Test
@@ -48,7 +48,7 @@ class TripRequestConsumerTest {
         consumer.onTripRequest(payload);
 
         verify(matchingEngine).findNearestDriver(null, null, 5);
-        verify(matchEventProducer).send("trip-123", "taxi_001", 1200.5, 300, 5, 12);
+        verify(matchEventProducer).send("trip-123", "taxi_001", "", 1200.5, 300, 5, 12);
     }
 
     @Test

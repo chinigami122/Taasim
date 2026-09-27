@@ -26,6 +26,12 @@ class BillingServiceTest {
     @Mock
     private KafkaTemplate<String, Object> kafkaTemplate;
 
+    @Mock
+    private StripeChargeService stripeChargeService;
+
+    @Mock
+    private ClientLookupService clientLookupService;
+
     private FareCalculator calculator;
     private BillingService billingService;
 
@@ -48,7 +54,7 @@ class BillingServiceTest {
         f4.setAccessible(true);
         f4.set(calculator, new BigDecimal("0.15"));
 
-        billingService = new BillingService(repository, calculator, kafkaTemplate);
+        billingService = new BillingService(repository, calculator, kafkaTemplate, stripeChargeService, clientLookupService);
     }
 
     @Test
@@ -56,9 +62,12 @@ class BillingServiceTest {
         when(repository.existsByTripId("trip-123")).thenReturn(false);
         when(repository.save(any(BillingRecord.class))).thenAnswer(invocation -> {
             BillingRecord r = invocation.getArgument(0);
-            r.setId(UUID.randomUUID());
+            if (r.getId() == null) {
+                r.setId(UUID.randomUUID());
+            }
             return r;
         });
+        when(stripeChargeService.isConfigured()).thenReturn(false);
 
         BillingRecord result = billingService.createBillingFor(
                 "trip-123", "driver-1", "rider-1", 5.0, 10.0, 1.0
@@ -68,9 +77,37 @@ class BillingServiceTest {
         assertThat(result.getTripId()).isEqualTo("trip-123");
         assertThat(result.getTotalFare()).isEqualByComparingTo("27.50");
         assertThat(result.getDriverPayout()).isEqualByComparingTo("23.37");
+        assertThat(result.getStatus()).isEqualTo("CALCULATED");
 
-        verify(repository, times(1)).save(any(BillingRecord.class));
+        verify(repository, atLeastOnce()).save(any(BillingRecord.class));
         verify(kafkaTemplate, times(1)).send(eq("billing.completed"), eq("trip-123"), any());
+    }
+
+    @Test
+    void createBillingFor_withStripe_chargesSuccessfully() throws Exception {
+        when(repository.existsByTripId("trip-123")).thenReturn(false);
+        when(repository.save(any(BillingRecord.class))).thenAnswer(invocation -> {
+            BillingRecord r = invocation.getArgument(0);
+            if (r.getId() == null) {
+                r.setId(UUID.randomUUID());
+            }
+            return r;
+        });
+        when(stripeChargeService.isConfigured()).thenReturn(true);
+        when(clientLookupService.getStripeCustomerId("rider-1")).thenReturn("cus_test123");
+        when(stripeChargeService.chargeCustomer(eq("cus_test123"), anyString(), eq(2750L), anyString(), eq("trip-123")))
+                .thenReturn("pi_test_abc123");
+
+        BillingRecord result = billingService.createBillingFor(
+                "trip-123", "driver-1", "rider-1", 5.0, 10.0, 1.0
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(result.getStatus()).isEqualTo("CHARGED");
+        assertThat(result.getStripePaymentId()).isEqualTo("pi_test_abc123");
+        assertThat(result.getChargedAt()).isNotNull();
+
+        verify(stripeChargeService, times(1)).chargeCustomer(eq("cus_test123"), anyString(), eq(2750L), anyString(), eq("trip-123"));
     }
 
     @Test

@@ -7,19 +7,26 @@ import com.taasim.auth.model.Role;
 import com.taasim.auth.model.User;
 import com.taasim.auth.repository.UserRepository;
 import com.taasim.auth.security.JwtTokenProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AuthService {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final StripeCustomerService stripeCustomerService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    public AuthService(UserRepository userRepository, JwtTokenProvider jwtTokenProvider) {
+    public AuthService(UserRepository userRepository, JwtTokenProvider jwtTokenProvider,
+                       StripeCustomerService stripeCustomerService) {
         this.userRepository = userRepository;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.stripeCustomerService = stripeCustomerService;
     }
 
     public User register(RegisterRequest request) {
@@ -36,7 +43,25 @@ public class AuthService {
         user.setRole(Role.valueOf(request.getRole().toUpperCase()));
 
         User saved = userRepository.save(user);
-        System.out.println("👤 Registered: " + saved.getEmail() + " [" + saved.getRole() + "]");
+        log.info("👤 Registered: {} [{}]", saved.getEmail(), saved.getRole());
+
+        // Slice 16 — create Stripe customer for CLIENT role (non-blocking)
+        if (saved.getRole() == Role.CLIENT) {
+            if (!stripeCustomerService.isConfigured()) {
+                log.warn("⚠️ Stripe not configured — skipping Stripe customer creation for {}", saved.getEmail());
+            } else {
+                try {
+                    String stripeId = stripeCustomerService.createCustomer(saved.getEmail(), saved.getFullName());
+                    saved.setStripeCustomerId(stripeId);
+                    saved = userRepository.save(saved);
+                    log.info("💳 Stripe customer {} linked to user {}", stripeId, saved.getEmail());
+                } catch (Exception e) {
+                    log.warn("⚠️ Stripe customer creation failed for {}: {}", saved.getEmail(), e.getMessage());
+                    // Don't fail registration — Stripe can be retried later
+                }
+            }
+        }
+
         return saved;
     }
 
@@ -52,7 +77,7 @@ public class AuthService {
                 user.getId(), user.getEmail(), user.getRole().name()
         );
 
-        System.out.println("🔑 Login: " + user.getEmail() + " [" + user.getRole() + "]");
+        log.info("🔑 Login: {} [{}]", user.getEmail(), user.getRole());
 
         return new AuthResponse(token, user.getRole().name(), user.getEmail(), user.getFullName());
     }

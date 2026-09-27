@@ -3,6 +3,7 @@ package com.taasim.matching.kafka;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -22,17 +23,24 @@ public class MatchEventProducer {
 
     public void send(String tripId, String driverId, double distanceMeters,
                      int etaSeconds, int originZone, int destinationZone) {
-        Map<String, Object> event = Map.of(
-                "trip_id", tripId,
-                "driver_id", driverId,
-                "distance_meters", distanceMeters,
-                "eta_seconds", etaSeconds,
-                "origin_zone", originZone,
-                "destination_zone", destinationZone,
-                "matched_at", System.currentTimeMillis()
-        );
+        send(tripId, driverId, null, distanceMeters, etaSeconds, originZone, destinationZone);
+    }
+
+    public void send(String tripId, String driverId, String riderId, double distanceMeters,
+                     int etaSeconds, int originZone, int destinationZone) {
+        Map<String, Object> event = new HashMap<>();
+        event.put("trip_id", tripId);
+        event.put("driver_id", driverId);
+        if (riderId != null && !riderId.isBlank()) {
+            event.put("rider_id", riderId);
+        }
+        event.put("distance_meters", distanceMeters);
+        event.put("eta_seconds", etaSeconds);
+        event.put("origin_zone", originZone);
+        event.put("destination_zone", destinationZone);
+        event.put("matched_at", System.currentTimeMillis());
 
         kafkaTemplate.send(TOPIC, tripId, event);
-        System.out.println("📡 Kafka → processed.matches: trip=" + tripId + " → driver=" + driverId);
+        System.out.println("📡 Kafka → processed.matches: trip=" + tripId + " → driver=" + driverId + " (rider=" + riderId + ")");
     }
 }

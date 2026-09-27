@@ -48,6 +48,14 @@ billing:
     surge-max: ${FARE_SURGE_MAX:2.5}
     commission-rate: ${FARE_COMMISSION:0.15}
 
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY:sk_test_placeholder_change_me}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_placeholder}
+  currency: ${STRIPE_CURRENCY:mad}
+
+auth-service:
+  base-url: ${AUTH_SERVICE_URL:http://localhost:8081}
+
 management:
   endpoints:
     web:
