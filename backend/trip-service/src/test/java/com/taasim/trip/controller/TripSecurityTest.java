@@ -17,7 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -82,7 +82,7 @@ class TripSecurityTest {
         trip.setOriginZone(5);
         trip.setDestZone(12);
 
-        when(tripService.createTrip(any())).thenReturn(trip);
+        when(tripService.createTrip(any(), any())).thenReturn(trip);
 
         mockMvc.perform(post("/api/trips/request")
                         .header("Authorization", "Bearer " + clientToken)
@@ -132,9 +132,27 @@ class TripSecurityTest {
     }
 
     @Test
+    void getHistory_noToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/trips/history"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getHistory_clientToken_returns200() throws Exception {
+        String clientToken = generateToken("client-1", "CLIENT");
+        when(tripService.findTripsForClient(any(), anyInt(), any())).thenReturn(java.util.List.of());
+
+        mockMvc.perform(get("/api/trips/history")
+                        .header("Authorization", "Bearer " + clientToken)
+                        .header("X-User-Id", "client-1"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void apiDocs_noToken_bypassesSecurity() throws Exception {
         // In WebMvcTest, /v3/api-docs reaches DispatcherServlet (404) rather than being blocked with 401 Unauthorized
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isNotFound());
     }
 }
+

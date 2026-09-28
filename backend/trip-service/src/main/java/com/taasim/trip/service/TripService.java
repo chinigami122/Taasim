@@ -37,6 +37,10 @@ public class TripService {
      * 3. Publish to Kafka raw.trips
      */
     public Trip createTrip(TripRequestDto request) {
+        return createTrip(request, null);
+    }
+
+    public Trip createTrip(TripRequestDto request, String authenticatedUserId) {
         String tripId = UUID.randomUUID().toString();
         Instant now = Instant.now();
         String dateBucket = DateTimeFormatter.ofPattern("yyyy-MM-dd")
@@ -46,12 +50,20 @@ public class TripService {
         int originZone = resolveOriginZone(request);
         int destZone = resolveDestinationZone(request);
 
+        String riderId = request.getRiderId();
+        if ((riderId == null || riderId.isBlank()) && authenticatedUserId != null && !authenticatedUserId.isBlank()) {
+            riderId = authenticatedUserId;
+        }
+        if (riderId == null || riderId.isBlank()) {
+            riderId = "unknown";
+        }
+
         Trip trip = new Trip();
         trip.setCity("casablanca");
         trip.setDateBucket(dateBucket);
         trip.setCreatedAt(now);
         trip.setTripId(tripId);
-        trip.setRiderId(request.getRiderId());
+        trip.setRiderId(riderId);
         trip.setOriginZone(originZone);
         trip.setDestZone(destZone);
         trip.setStatus("REQUESTED");
@@ -64,7 +76,7 @@ public class TripService {
         // Publish to Kafka with both coordinates and zones
         tripEventProducer.send(
                 tripId,
-                request.getRiderId(),
+                riderId,
                 originZone,
                 destZone,
                 request.getOriginLat(),
@@ -80,6 +92,69 @@ public class TripService {
 
         return trip;
     }
+
+    /**
+     * List recent trips for an authenticated client.
+     */
+    public java.util.List<Map<String, Object>> findTripsForClient(String clientId, int limit, String fromDate) {
+        java.time.LocalDate today = java.time.LocalDate.now(ZoneOffset.UTC);
+        java.util.List<String> buckets = java.util.List.of(
+                today.toString(),
+                today.minusDays(1).toString(),
+                today.minusDays(2).toString()
+        );
+
+        java.util.List<Map<String, Object>> results = new java.util.ArrayList<>();
+
+        for (String bucket : buckets) {
+            var rows = cassandraTemplate.getCqlOperations().queryForList(
+                    "SELECT trip_id, status, taxi_id, eta_seconds, origin_zone, dest_zone, created_at, rider_id " +
+                            "FROM taasim.trips WHERE city = 'casablanca' AND date_bucket = ?",
+                    bucket
+            );
+
+            for (Map<String, Object> r : rows) {
+                String rider = (String) r.get("rider_id");
+                if (clientId.equals(rider)) {
+                    Object createdAtObj = r.get("created_at");
+                    String createdAtStr = createdAtObj != null ? createdAtObj.toString() : "";
+                    results.add(Map.of(
+                            "tripId",     r.get("trip_id") != null ? r.get("trip_id") : "",
+                            "status",     r.get("status") != null ? r.get("status") : "",
+                            "driverId",   r.get("taxi_id") != null ? r.get("taxi_id") : "",
+                            "etaSeconds", r.get("eta_seconds") != null ? r.get("eta_seconds") : 0,
+                            "originZone", r.get("origin_zone") != null ? r.get("origin_zone") : 1,
+                            "destZone",   r.get("dest_zone") != null ? r.get("dest_zone") : 1,
+                            "createdAt",  createdAtStr
+                    ));
+                }
+            }
+            if (results.size() >= limit) {
+                break;
+            }
+        }
+
+        // Also check in-memory cache for recent trips in case Cassandra propagation is pending
+        for (Trip cached : tripCache.values()) {
+            if (clientId.equals(cached.getRiderId())) {
+                boolean alreadyInResults = results.stream().anyMatch(m -> cached.getTripId().equals(m.get("tripId")));
+                if (!alreadyInResults) {
+                    results.add(0, Map.of(
+                            "tripId",     cached.getTripId(),
+                            "status",     cached.getStatus() != null ? cached.getStatus() : "",
+                            "driverId",   cached.getTaxiId() != null ? cached.getTaxiId() : "",
+                            "etaSeconds", cached.getEtaSeconds() != null ? cached.getEtaSeconds() : 0,
+                            "originZone", cached.getOriginZone(),
+                            "destZone",   cached.getDestZone(),
+                            "createdAt",  cached.getCreatedAt() != null ? cached.getCreatedAt().toString() : ""
+                    ));
+                }
+            }
+        }
+
+        return results.stream().limit(limit).toList();
+    }
+
 
     private int resolveOriginZone(TripRequestDto request) {
         if (request.getOriginZone() != null && request.getOriginZone() >= 1 && request.getOriginZone() <= 16) {

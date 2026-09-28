@@ -45,8 +45,10 @@ public class TripController {
     })
     @PreAuthorize("hasRole('CLIENT')")
     @PostMapping("/request")
-    public ResponseEntity<Map<String, Object>> requestTrip(@RequestBody TripRequestDto request) {
-        Trip trip = tripService.createTrip(request);
+    public ResponseEntity<Map<String, Object>> requestTrip(
+            @RequestBody TripRequestDto request,
+            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+        Trip trip = tripService.createTrip(request, userId);
 
         return ResponseEntity.ok(Map.of(
                 "tripId", trip.getTripId(),
@@ -56,6 +58,26 @@ public class TripController {
                 "message", "Trip request submitted"
         ));
     }
+
+    @Operation(summary = "List trips for the authenticated user")
+    @GetMapping("/history")
+    @PreAuthorize("hasRole('CLIENT')")
+    public ResponseEntity<?> getMyTrips(
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam(required = false) String fromDate) {
+        if (userId == null || userId.isBlank()) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Missing user context"));
+        }
+        var trips = tripService.findTripsForClient(userId, limit, fromDate);
+        return ResponseEntity.ok(Map.of(
+                "trips", trips,
+                "count", trips.size(),
+                "nextFromDate", trips.isEmpty() ? "" : trips.get(trips.size() - 1).get("createdAt")
+        ));
+    }
+
 
     /**
      * GET /api/trips/{tripId}

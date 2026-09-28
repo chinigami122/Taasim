@@ -1,6 +1,8 @@
 package com.taasim.billing.repository;
 
 import com.taasim.billing.model.BillingRecord;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -14,7 +16,9 @@ public interface BillingRecordRepository extends JpaRepository<BillingRecord, UU
     Optional<BillingRecord> findByTripId(String tripId);
     List<BillingRecord> findByDriverIdOrderByCreatedAtDesc(String driverId);
     List<BillingRecord> findByClientIdOrderByCreatedAtDesc(String clientId);
+    Page<BillingRecord> findByClientId(String clientId, Pageable pageable);
     boolean existsByTripId(String tripId);
     List<BillingRecord> findByStatusAndCreatedAtBeforeAndChargeAttemptsLessThan(String status, Instant createdAt, int chargeAttempts);
 }
+
 
