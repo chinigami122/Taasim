@@ -128,4 +128,54 @@ class BillingServiceTest {
         verify(repository, never()).save(any());
         verify(kafkaTemplate, never()).send(anyString(), anyString(), any());
     }
+
+    @Test
+    void createBillingFor_stripeFails_incrementsAttemptsAndSetsError() throws Exception {
+        when(repository.existsByTripId("trip-123")).thenReturn(false);
+        when(repository.save(any(BillingRecord.class))).thenAnswer(invocation -> {
+            BillingRecord r = invocation.getArgument(0);
+            if (r.getId() == null) {
+                r.setId(UUID.randomUUID());
+            }
+            return r;
+        });
+        when(stripeChargeService.isConfigured()).thenReturn(true);
+        when(clientLookupService.getStripeCustomerId("rider-1")).thenReturn("cus_test123");
+        when(stripeChargeService.chargeCustomer(anyString(), anyString(), anyLong(), anyString(), anyString()))
+                .thenThrow(new RuntimeException("Card declined"));
+
+        BillingRecord result = billingService.createBillingFor(
+                "trip-123", "driver-1", "rider-1", 5.0, 10.0, 1.0
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(result.getStatus()).isEqualTo("CALCULATED");
+        assertThat(result.getChargeAttempts()).isEqualTo(1);
+        assertThat(result.getLastChargeError()).isEqualTo("Card declined");
+        assertThat(result.getLastAttemptedAt()).isNotNull();
+    }
+
+    @Test
+    void retryCharge_stripeFails5Times_setsChargeFailed() throws Exception {
+        BillingRecord record = new BillingRecord();
+        record.setId(UUID.randomUUID());
+        record.setTripId("trip-123");
+        record.setClientId("rider-1");
+        record.setStatus("CALCULATED");
+        record.setTotalFare(new BigDecimal("27.50"));
+        record.setChargeAttempts(4);
+
+        when(stripeChargeService.isConfigured()).thenReturn(true);
+        when(clientLookupService.getStripeCustomerId("rider-1")).thenReturn("cus_test123");
+        when(stripeChargeService.chargeCustomer(anyString(), anyString(), anyLong(), anyString(), anyString()))
+                .thenThrow(new RuntimeException("Connection timeout"));
+        when(repository.save(any(BillingRecord.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        billingService.retryCharge(record);
+
+        assertThat(record.getStatus()).isEqualTo("CHARGE_FAILED");
+        assertThat(record.getChargeAttempts()).isEqualTo(5);
+        assertThat(record.getLastChargeError()).isEqualTo("Connection timeout");
+    }
 }
+

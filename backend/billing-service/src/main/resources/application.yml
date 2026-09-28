@@ -56,6 +56,21 @@ stripe:
 auth-service:
   base-url: ${AUTH_SERVICE_URL:http://localhost:8081}
 
+resilience4j:
+  retry:
+    instances:
+      stripe-charge:
+        max-attempts: 5
+        wait-duration: 500ms
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - java.io.IOException
+          - com.stripe.exception.ApiConnectionException
+          - com.stripe.exception.RateLimitException
+        ignore-exceptions:
+          - com.stripe.exception.CardException
+          - com.stripe.exception.InvalidRequestException
+
 management:
   endpoints:
     web:
@@ -64,3 +79,8 @@ management:
   endpoint:
     health:
       show-details: always
+
+jwt:
+  secret: ${JWT_SECRET:dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}
+
+

@@ -58,6 +58,17 @@
             <version>2.7.0</version>
         </dependency>
 
+        <!-- Resilience4j & AOP (Slice 16.5) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+
         <!-- Stripe Java SDK (Slice 16) -->
         <dependency>
             <groupId>com.stripe</groupId>

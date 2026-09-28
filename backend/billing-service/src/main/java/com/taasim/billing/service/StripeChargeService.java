@@ -3,7 +3,10 @@ package com.taasim.billing.service;
 import com.stripe.Stripe;
 import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
+import com.stripe.net.RequestOptions;
 import com.stripe.param.PaymentIntentCreateParams;
+import com.taasim.billing.exception.StripeChargeFailedException;
+import io.github.resilience4j.retry.annotation.Retry;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,9 +39,10 @@ public class StripeChargeService {
     }
 
     /**
-     * Create + confirm a PaymentIntent in one call. Test mode uses {@code pm_card_visa}
-     * which auto-confirms. In production the frontend supplies a real PaymentMethod.
+     * Create + confirm a PaymentIntent with a deterministic Idempotency-Key.
+     * Protected by Resilience4j @Retry with exponential backoff on transient errors.
      */
+    @Retry(name = "stripe-charge")
     public String chargeCustomer(String stripeCustomerId,
                                  String paymentMethodId,
                                  long amountMinorUnits,
@@ -65,12 +69,19 @@ public class StripeChargeService {
                                 .build())
                 .build();
 
-        PaymentIntent intent = PaymentIntent.create(params);
+        // Idempotency key: deterministic from trip_id → Stripe returns the same PaymentIntent
+        // if the request is retried within 24 hours.
+        RequestOptions options = RequestOptions.builder()
+                .setIdempotencyKey("charge-trip-" + tripId)
+                .build();
+
+        PaymentIntent intent = PaymentIntent.create(params, options);
 
         if (!"succeeded".equals(intent.getStatus())) {
-            throw new RuntimeException("PaymentIntent status: " + intent.getStatus() + " (id=" + intent.getId() + ")");
+            throw new StripeChargeFailedException(
+                    "PaymentIntent status: " + intent.getStatus() + " (id=" + intent.getId() + ")");
         }
         log.info("💳 Stripe charge OK: {} for trip {} (amount={} {})", intent.getId(), tripId, amountMinorUnits, currency);
         return intent.getId();
     }
-}
+}

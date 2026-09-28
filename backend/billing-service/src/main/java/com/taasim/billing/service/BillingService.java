@@ -104,6 +104,29 @@ public class BillingService {
             return;
         }
 
+        executeCharge(record, stripeCustomerId);
+    }
+
+    public void retryCharge(BillingRecord record) {
+        if (!"CALCULATED".equals(record.getStatus())) {
+            return;
+        }
+        if (stripeChargeService == null || !stripeChargeService.isConfigured()) {
+            return;
+        }
+        String stripeCustomerId = clientLookupService != null
+                ? clientLookupService.getStripeCustomerId(record.getClientId())
+                : null;
+
+        if (stripeCustomerId != null && !stripeCustomerId.isBlank()) {
+            executeCharge(record, stripeCustomerId);
+        }
+    }
+
+    private void executeCharge(BillingRecord record, String stripeCustomerId) {
+        record.setChargeAttempts(record.getChargeAttempts() + 1);
+        record.setLastAttemptedAt(Instant.now());
+
         try {
             String pm = "pm_card_visa"; // Stripe test PaymentMethod
             long amountMinor = record.getTotalFare().movePointRight(2).longValueExact();
@@ -117,11 +140,20 @@ public class BillingService {
             record.setStatus("CHARGED");
             record.setStripePaymentId(pi);
             record.setChargedAt(Instant.now());
+            record.setLastChargeError(null);
             repo.save(record);
             log.info("💳 Stripe charge OK: {} for trip {}", pi, record.getTripId());
         } catch (Exception e) {
-            log.error("❌ Stripe charge failed for trip {}: {}", record.getTripId(), e.getMessage());
-            // Leave status as CALCULATED — retry will be handled in Slice 16.5 / 20.5
+            record.setLastChargeError(e.getMessage());
+            if (record.getChargeAttempts() >= 5) {
+                record.setStatus("CHARGE_FAILED");
+                log.error("🛑 Stripe charge permanently failed after {} attempts for trip {}: {}",
+                        record.getChargeAttempts(), record.getTripId(), e.getMessage());
+            } else {
+                log.warn("⚠️ Stripe charge failed (attempt {}/5) for trip {}: {}",
+                        record.getChargeAttempts(), record.getTripId(), e.getMessage());
+            }
+            repo.save(record);
         }
     }
 
@@ -129,3 +161,4 @@ public class BillingService {
         return repo.findByTripId(tripId);
     }
 }
+

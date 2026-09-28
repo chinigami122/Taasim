@@ -4,6 +4,7 @@ import com.taasim.billing.model.BillingRecord;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -14,4 +15,6 @@ public interface BillingRecordRepository extends JpaRepository<BillingRecord, UU
     List<BillingRecord> findByDriverIdOrderByCreatedAtDesc(String driverId);
     List<BillingRecord> findByClientIdOrderByCreatedAtDesc(String clientId);
     boolean existsByTripId(String tripId);
+    List<BillingRecord> findByStatusAndCreatedAtBeforeAndChargeAttemptsLessThan(String status, Instant createdAt, int chargeAttempts);
 }
+

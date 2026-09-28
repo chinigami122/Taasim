@@ -64,6 +64,15 @@ public class BillingRecord {
     @Column(name = "charged_at")
     private Instant chargedAt;
 
+    @Column(name = "charge_attempts", nullable = false)
+    private int chargeAttempts = 0;
+
+    @Column(name = "last_charge_error")
+    private String lastChargeError;
+
+    @Column(name = "last_attempted_at")
+    private Instant lastAttemptedAt;
+
     public BillingRecord() {}
 
     public UUID getId() { return id; }
@@ -119,4 +128,14 @@ public class BillingRecord {
 
     public Instant getChargedAt() { return chargedAt; }
     public void setChargedAt(Instant chargedAt) { this.chargedAt = chargedAt; }
+
+    public int getChargeAttempts() { return chargeAttempts; }
+    public void setChargeAttempts(int chargeAttempts) { this.chargeAttempts = chargeAttempts; }
+
+    public String getLastChargeError() { return lastChargeError; }
+    public void setLastChargeError(String lastChargeError) { this.lastChargeError = lastChargeError; }
+
+    public Instant getLastAttemptedAt() { return lastAttemptedAt; }
+    public void setLastAttemptedAt(Instant lastAttemptedAt) { this.lastAttemptedAt = lastAttemptedAt; }
 }
+
