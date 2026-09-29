@@ -42,7 +42,12 @@ public class DriverController {
     @PreAuthorize("hasRole('DRIVER')")
     @PostMapping("/location")
     public ResponseEntity<Map<String, Object>> receiveLocation(
-            @RequestBody GpsPingRequest request) {
+            @RequestBody GpsPingRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+
+        if ((request.getDriverId() == null || request.getDriverId().isBlank()) && userId != null && !userId.isBlank()) {
+            request.setDriverId(userId);
+        }
 
         VehiclePosition saved = locationService.processGpsPing(request);
 
@@ -140,5 +145,37 @@ public class DriverController {
             ));
         }
         return ResponseEntity.ok(Map.of("status", "ok", "message", "Ride completed"));
+    }
+
+    @Operation(summary = "Get driver trip history from Cassandra", description = "Retrieves past trips for the authenticated driver.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Trip history returned"),
+        @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
+        @ApiResponse(responseCode = "403", description = "Insufficient role or accessing another driver's data")
+    })
+    @GetMapping("/trips/history")
+    @PreAuthorize("hasAnyRole('DRIVER', 'ADMIN')")
+    public ResponseEntity<?> myTrips(
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
+            @RequestParam(value = "driverId", required = false) String queryDriverId,
+            @RequestParam(defaultValue = "20") int limit) {
+
+        // Tenant isolation: DRIVER can only view their own trip history
+        if (queryDriverId != null && !queryDriverId.isBlank() && userId != null && !userId.equals(queryDriverId)) {
+            if (!"ADMIN".equals(role)) {
+                return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).body(Map.of(
+                        "status", "error",
+                        "message", "Access denied: cannot view another driver's trip history"
+                ));
+            }
+        }
+
+        String effectiveDriverId = (queryDriverId != null && !queryDriverId.isBlank()) ? queryDriverId : userId;
+        if (effectiveDriverId == null || effectiveDriverId.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Driver ID missing"));
+        }
+
+        return ResponseEntity.ok(driverService.findTripsForDriver(effectiveDriverId, limit));
     }
 }

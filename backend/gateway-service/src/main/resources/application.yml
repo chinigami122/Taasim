@@ -52,6 +52,12 @@ spring:
                 redis-rate-limiter.burstCapacity: 40
                 key-resolver: "#{@userKeyResolver}"
 
+        # Driver earnings route (billing-service)
+        - id: driver-earnings
+          uri: ${BILLING_SERVICE_URI:http://localhost:8086}
+          predicates:
+            - Path=/api/drivers/earnings/**
+
         # General driver service routes
         - id: driver-service
           uri: ${DRIVER_SERVICE_URI:http://localhost:8083}

@@ -19,7 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -126,5 +126,42 @@ class DriverSecurityTest {
         // In WebMvcTest, /v3/api-docs reaches DispatcherServlet (404) rather than being blocked with 401 Unauthorized
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void tripsHistory_noToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/drivers/trips/history"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void tripsHistory_clientToken_returns403() throws Exception {
+        String clientToken = generateToken("client-1", "CLIENT");
+        mockMvc.perform(get("/api/drivers/trips/history")
+                        .header("Authorization", "Bearer " + clientToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void tripsHistory_driverToken_returns200() throws Exception {
+        String driverToken = generateToken("driver-1", "DRIVER");
+        when(driverService.findTripsForDriver(any(), anyInt())).thenReturn(java.util.List.of());
+
+        mockMvc.perform(get("/api/drivers/trips/history")
+                        .header("Authorization", "Bearer " + driverToken)
+                        .header("X-User-Id", "driver-1")
+                        .header("X-User-Role", "DRIVER"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void tripsHistory_driverAccessingAnotherDriver_returns403() throws Exception {
+        String driverToken = generateToken("driver-1", "DRIVER");
+
+        mockMvc.perform(get("/api/drivers/trips/history?driverId=driver-2")
+                        .header("Authorization", "Bearer " + driverToken)
+                        .header("X-User-Id", "driver-1")
+                        .header("X-User-Role", "DRIVER"))
+                .andExpect(status().isForbidden());
     }
 }

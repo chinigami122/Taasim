@@ -3,6 +3,8 @@ package com.taasim.driver.service;
 import com.taasim.common.util.GeoUtils;
 import com.taasim.driver.kafka.TripCompletedProducer;
 import com.taasim.driver.kafka.TripStatusProducer;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.cassandra.core.CassandraTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -18,6 +20,7 @@ public class DriverService {
 
     private final TripStatusProducer tripStatusProducer;
     private final TripCompletedProducer tripCompletedProducer;
+    private final CassandraTemplate cassandraTemplate;
 
     // In-memory: driverId → assigned tripId (waiting for accept/reject)
     private final Map<String, String> pendingTrips = new ConcurrentHashMap<>();
@@ -42,8 +45,16 @@ public class DriverService {
 
     public DriverService(TripStatusProducer tripStatusProducer,
                          TripCompletedProducer tripCompletedProducer) {
+        this(tripStatusProducer, tripCompletedProducer, null);
+    }
+
+    @Autowired
+    public DriverService(TripStatusProducer tripStatusProducer,
+                         TripCompletedProducer tripCompletedProducer,
+                         @Autowired(required = false) CassandraTemplate cassandraTemplate) {
         this.tripStatusProducer = tripStatusProducer;
         this.tripCompletedProducer = tripCompletedProducer;
+        this.cassandraTemplate = cassandraTemplate;
     }
 
     /** Called when a match event assigns a trip to this driver */
@@ -165,5 +176,60 @@ public class DriverService {
         System.out.println("🏁 Driver " + driverId + " completed trip " + tripId +
                 " [Dist: " + finalDistKm + " km, Duration: " + durationMin + " min]");
         return true;
+    }
+
+    /**
+     * Find recent trips for a driver from Cassandra.
+     */
+    public java.util.List<Map<String, Object>> findTripsForDriver(String driverId, int limit) {
+        if (driverId == null || driverId.isBlank()) {
+            return java.util.List.of();
+        }
+
+        java.util.List<Map<String, Object>> results = new java.util.ArrayList<>();
+
+        if (cassandraTemplate != null) {
+            try {
+                var rows = cassandraTemplate.getCqlOperations().queryForList(
+                        "SELECT trip_id, status, taxi_id, rider_id, eta_seconds, origin_zone, dest_zone, created_at " +
+                                "FROM taasim.trips WHERE taxi_id = ? LIMIT ?",
+                        driverId, limit
+                );
+
+                for (Map<String, Object> r : rows) {
+                    Object createdAtObj = r.get("created_at");
+                    String createdAtStr = createdAtObj != null ? createdAtObj.toString() : "";
+                    results.add(Map.of(
+                            "tripId",     r.get("trip_id") != null ? r.get("trip_id") : "",
+                            "status",     r.get("status") != null ? r.get("status") : "",
+                            "driverId",   r.get("taxi_id") != null ? r.get("taxi_id") : driverId,
+                            "riderId",    r.get("rider_id") != null ? r.get("rider_id") : "",
+                            "etaSeconds", r.get("eta_seconds") != null ? r.get("eta_seconds") : 0,
+                            "originZone", r.get("origin_zone") != null ? r.get("origin_zone") : 1,
+                            "destZone",   r.get("dest_zone") != null ? r.get("dest_zone") : 1,
+                            "createdAt",  createdAtStr
+                    ));
+                }
+            } catch (Exception e) {
+                System.err.println("⚠️ Error querying driver trip history from Cassandra: " + e.getMessage());
+            }
+        }
+
+        // Include any active trip for this driver not yet completed
+        String activeTripId = activeTrips.get(driverId);
+        if (activeTripId != null && results.stream().noneMatch(m -> activeTripId.equals(m.get("tripId")))) {
+            results.add(0, Map.of(
+                    "tripId",     activeTripId,
+                    "status",     "IN_PROGRESS",
+                    "driverId",   driverId,
+                    "riderId",    tripClients.getOrDefault(activeTripId, "unknown"),
+                    "etaSeconds", 0,
+                    "originZone", 1,
+                    "destZone",   1,
+                    "createdAt",  Instant.now().toString()
+            ));
+        }
+
+        return results;
     }
 }
