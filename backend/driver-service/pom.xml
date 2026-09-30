@@ -66,6 +66,12 @@
             <version>2.7.0</version>
         </dependency>
 
+        <!-- WebSocket: STOMP over SockJS for live tracking (Slice 19) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
         <!-- ================ Test scope ================ -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -58,6 +58,12 @@ spring:
           predicates:
             - Path=/api/drivers/earnings/**
 
+        # WebSocket live driver tracking route (driver-service)
+        - id: ws-tracking
+          uri: ${DRIVER_SERVICE_URI:http://localhost:8083}
+          predicates:
+            - Path=/ws/tracking/**
+
         # General driver service routes
         - id: driver-service
           uri: ${DRIVER_SERVICE_URI:http://localhost:8083}

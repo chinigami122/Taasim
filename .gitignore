@@ -47,3 +47,8 @@ backend/**/target/
 .env
 .env.local
 *.secret
+
+# Node
+node_modules/
+**/node_modules/
+

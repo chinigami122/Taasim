@@ -12,9 +12,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
+import java.util.Map;
 
 /**
  * Processes incoming GPS pings from drivers.
@@ -32,18 +34,21 @@ public class LocationService {
     private final DriverService driverService;
     private final RestClient restClient;
     private final String geospatialServiceUrl;
+    private final SimpMessagingTemplate wsTemplate;
 
     @Autowired
     public LocationService(
             VehiclePositionRepository repository,
             GpsEventProducer gpsEventProducer,
             DriverService driverService,
-            @Value("${geospatial.service.url:http://localhost:8084}") String geospatialServiceUrl
+            @Value("${geospatial.service.url:http://localhost:8084}") String geospatialServiceUrl,
+            @Autowired(required = false) SimpMessagingTemplate wsTemplate
     ) {
         this.repository = repository;
         this.gpsEventProducer = gpsEventProducer;
         this.driverService = driverService;
         this.geospatialServiceUrl = geospatialServiceUrl;
+        this.wsTemplate = wsTemplate;
 
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(1000);
@@ -60,11 +65,21 @@ public class LocationService {
                            DriverService driverService,
                            RestClient restClient,
                            String geospatialServiceUrl) {
+        this(repository, gpsEventProducer, driverService, restClient, geospatialServiceUrl, null);
+    }
+
+    public LocationService(VehiclePositionRepository repository,
+                           GpsEventProducer gpsEventProducer,
+                           DriverService driverService,
+                           RestClient restClient,
+                           String geospatialServiceUrl,
+                           SimpMessagingTemplate wsTemplate) {
         this.repository = repository;
         this.gpsEventProducer = gpsEventProducer;
         this.driverService = driverService;
         this.restClient = restClient;
         this.geospatialServiceUrl = geospatialServiceUrl;
+        this.wsTemplate = wsTemplate;
     }
 
     /**
@@ -108,6 +123,24 @@ public class LocationService {
         // ── 4. Track Ride Distance in DriverService if ride is in progress ──
         if (driverService != null) {
             driverService.recordGpsMovement(request.getDriverId(), request.getLat(), request.getLon());
+        }
+
+        // ── 5. Broadcast to WebSocket if ride is active (Slice 19) ──
+        if (wsTemplate != null && driverService != null) {
+            String activeTrip = driverService.getActiveTrip(request.getDriverId());
+            if (activeTrip != null && !activeTrip.isBlank()) {
+                wsTemplate.convertAndSend(
+                        "/topic/trips/" + activeTrip + "/location",
+                        Map.of(
+                                "driverId", request.getDriverId(),
+                                "tripId", activeTrip,
+                                "lat", request.getLat(),
+                                "lon", request.getLon(),
+                                "speed", request.getSpeed(),
+                                "ts", System.currentTimeMillis()
+                        )
+                );
+            }
         }
 
         System.out.println("📍 Saved GPS: " + request.getDriverId()
