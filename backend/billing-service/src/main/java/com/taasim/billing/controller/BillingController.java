@@ -41,8 +41,7 @@ public class BillingController {
                 "records", records.getContent().stream().map(this::toSummaryDto).toList(),
                 "totalPages", records.getTotalPages(),
                 "totalElements", records.getTotalElements(),
-                "page", page
-        ));
+                "page", page));
     }
 
     @Operation(summary = "Get detailed fare breakdown by Trip ID")
@@ -111,5 +110,3 @@ public class BillingController {
         return map;
     }
 }
-
-

@@ -20,7 +20,7 @@ import java.util.Map;
 
 @Tag(name = "Driver Earnings", description = "Driver payout and earnings summary")
 @RestController
-@RequestMapping({"/api/drivers/earnings", "/api/billing/drivers/earnings"})
+@RequestMapping({ "/api/drivers/earnings", "/api/billing/drivers/earnings" })
 public class DriverEarningsController {
 
     private final BillingRecordRepository repo;
@@ -42,8 +42,7 @@ public class DriverEarningsController {
             if (!"ADMIN".equals(role)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
                         "status", "error",
-                        "message", "Access denied: cannot view another driver's earnings"
-                ));
+                        "message", "Access denied: cannot view another driver's earnings"));
             }
         }
 
@@ -66,16 +65,13 @@ public class DriverEarningsController {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("today", Map.of(
                 "earnings", repo.sumPayoutSince(effectiveDriverId, startOfDay),
-                "trips", repo.countCompletedSince(effectiveDriverId, startOfDay)
-        ));
+                "trips", repo.countCompletedSince(effectiveDriverId, startOfDay)));
         response.put("thisWeek", Map.of(
                 "earnings", repo.sumPayoutSince(effectiveDriverId, startOfWeek),
-                "trips", repo.countCompletedSince(effectiveDriverId, startOfWeek)
-        ));
+                "trips", repo.countCompletedSince(effectiveDriverId, startOfWeek)));
         response.put("thisMonth", Map.of(
                 "earnings", repo.sumPayoutSince(effectiveDriverId, startOfMonth),
-                "trips", repo.countCompletedSince(effectiveDriverId, startOfMonth)
-        ));
+                "trips", repo.countCompletedSince(effectiveDriverId, startOfMonth)));
         response.put("currency", "MAD");
 
         return ResponseEntity.ok(response);
@@ -96,8 +92,7 @@ public class DriverEarningsController {
             if (!"ADMIN".equals(role)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
                         "status", "error",
-                        "message", "Access denied: cannot view another driver's trip earnings"
-                ));
+                        "message", "Access denied: cannot view another driver's trip earnings"));
             }
         }
 
@@ -118,8 +113,8 @@ public class DriverEarningsController {
             item.put("distanceKm", r.getDistanceKm() != null ? r.getDistanceKm() : 0);
             item.put("durationMin", r.getDurationMin() != null ? r.getDurationMin() : 0);
             item.put("status", r.getStatus() != null ? r.getStatus() : "");
-            item.put("chargedAt", r.getChargedAt() != null ? r.getChargedAt().toString() :
-                    (r.getCreatedAt() != null ? r.getCreatedAt().toString() : ""));
+            item.put("chargedAt", r.getChargedAt() != null ? r.getChargedAt().toString()
+                    : (r.getCreatedAt() != null ? r.getCreatedAt().toString() : ""));
             return item;
         }).toList();
 

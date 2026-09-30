@@ -54,7 +54,8 @@ class BillingServiceTest {
         f4.setAccessible(true);
         f4.set(calculator, new BigDecimal("0.15"));
 
-        billingService = new BillingService(repository, calculator, kafkaTemplate, stripeChargeService, clientLookupService);
+        billingService = new BillingService(repository, calculator, kafkaTemplate, stripeChargeService,
+                clientLookupService);
     }
 
     @Test
@@ -70,8 +71,7 @@ class BillingServiceTest {
         when(stripeChargeService.isConfigured()).thenReturn(false);
 
         BillingRecord result = billingService.createBillingFor(
-                "trip-123", "driver-1", "rider-1", 5.0, 10.0, 1.0
-        );
+                "trip-123", "driver-1", "rider-1", 5.0, 10.0, 1.0);
 
         assertThat(result).isNotNull();
         assertThat(result.getTripId()).isEqualTo("trip-123");
@@ -99,15 +99,15 @@ class BillingServiceTest {
                 .thenReturn("pi_test_abc123");
 
         BillingRecord result = billingService.createBillingFor(
-                "trip-123", "driver-1", "rider-1", 5.0, 10.0, 1.0
-        );
+                "trip-123", "driver-1", "rider-1", 5.0, 10.0, 1.0);
 
         assertThat(result).isNotNull();
         assertThat(result.getStatus()).isEqualTo("CHARGED");
         assertThat(result.getStripePaymentId()).isEqualTo("pi_test_abc123");
         assertThat(result.getChargedAt()).isNotNull();
 
-        verify(stripeChargeService, times(1)).chargeCustomer(eq("cus_test123"), anyString(), eq(2750L), anyString(), eq("trip-123"));
+        verify(stripeChargeService, times(1)).chargeCustomer(eq("cus_test123"), anyString(), eq(2750L), anyString(),
+                eq("trip-123"));
     }
 
     @Test
@@ -121,8 +121,7 @@ class BillingServiceTest {
         when(repository.findByTripId("trip-123")).thenReturn(Optional.of(existing));
 
         BillingRecord result = billingService.createBillingFor(
-                "trip-123", "driver-1", "rider-1", 5.0, 10.0, 1.0
-        );
+                "trip-123", "driver-1", "rider-1", 5.0, 10.0, 1.0);
 
         assertThat(result).isSameAs(existing);
         verify(repository, never()).save(any());
@@ -145,8 +144,7 @@ class BillingServiceTest {
                 .thenThrow(new RuntimeException("Card declined"));
 
         BillingRecord result = billingService.createBillingFor(
-                "trip-123", "driver-1", "rider-1", 5.0, 10.0, 1.0
-        );
+                "trip-123", "driver-1", "rider-1", 5.0, 10.0, 1.0);
 
         assertThat(result).isNotNull();
         assertThat(result.getStatus()).isEqualTo("CALCULATED");
@@ -178,4 +176,3 @@ class BillingServiceTest {
         assertThat(record.getLastChargeError()).isEqualTo("Connection timeout");
     }
 }
-
