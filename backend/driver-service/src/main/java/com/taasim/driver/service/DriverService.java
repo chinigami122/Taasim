@@ -5,11 +5,12 @@ import com.taasim.driver.kafka.TripCompletedProducer;
 import com.taasim.driver.kafka.TripStatusProducer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.cassandra.core.CassandraTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -21,6 +22,7 @@ public class DriverService {
     private final TripStatusProducer tripStatusProducer;
     private final TripCompletedProducer tripCompletedProducer;
     private final CassandraTemplate cassandraTemplate;
+    private final StringRedisTemplate redisTemplate;
 
     // In-memory: driverId → assigned tripId (waiting for accept/reject)
     private final Map<String, String> pendingTrips = new ConcurrentHashMap<>();
@@ -40,21 +42,32 @@ public class DriverService {
     // In-memory: driverId → [lat, lon]
     private final Map<String, double[]> lastPositions = new ConcurrentHashMap<>();
 
+    // In-memory: driverId → last seen Instant
+    private final Map<String, Instant> lastSeen = new ConcurrentHashMap<>();
+
     // In-memory: tripId → clientId
     private final Map<String, String> tripClients = new ConcurrentHashMap<>();
 
     public DriverService(TripStatusProducer tripStatusProducer,
                          TripCompletedProducer tripCompletedProducer) {
-        this(tripStatusProducer, tripCompletedProducer, null);
+        this(tripStatusProducer, tripCompletedProducer, null, null);
+    }
+
+    public DriverService(TripStatusProducer tripStatusProducer,
+                         TripCompletedProducer tripCompletedProducer,
+                         CassandraTemplate cassandraTemplate) {
+        this(tripStatusProducer, tripCompletedProducer, cassandraTemplate, null);
     }
 
     @Autowired
     public DriverService(TripStatusProducer tripStatusProducer,
                          TripCompletedProducer tripCompletedProducer,
-                         @Autowired(required = false) CassandraTemplate cassandraTemplate) {
+                         @Autowired(required = false) CassandraTemplate cassandraTemplate,
+                         @Autowired(required = false) StringRedisTemplate redisTemplate) {
         this.tripStatusProducer = tripStatusProducer;
         this.tripCompletedProducer = tripCompletedProducer;
         this.cassandraTemplate = cassandraTemplate;
+        this.redisTemplate = redisTemplate;
     }
 
     /** Called when a match event assigns a trip to this driver */
@@ -129,6 +142,9 @@ public class DriverService {
 
     /** Track incremental distance for an active trip from GPS telemetry */
     public void recordGpsMovement(String driverId, double lat, double lon) {
+        lastSeen.put(driverId, Instant.now());
+        driverStatus.putIfAbsent(driverId, "AVAILABLE");
+
         String tripId = activeTrips.get(driverId);
         double[] previous = lastPositions.put(driverId, new double[]{lat, lon});
 
@@ -231,5 +247,145 @@ public class DriverService {
         }
 
         return results;
+    }
+
+    /**
+     * List all drivers with their current status and position, with optional status filter and pagination.
+     */
+    public List<Map<String, Object>> listAllDrivers(String statusFilter, int page, int size) {
+        Set<String> allDriverIds = new LinkedHashSet<>();
+        allDriverIds.addAll(driverStatus.keySet());
+        allDriverIds.addAll(lastPositions.keySet());
+        allDriverIds.addAll(activeTrips.keySet());
+        allDriverIds.addAll(pendingTrips.keySet());
+
+        if (redisTemplate != null) {
+            try {
+                Set<String> redisDrivers = redisTemplate.opsForZSet().range("drivers:available", 0, -1);
+                if (redisDrivers != null) {
+                    allDriverIds.addAll(redisDrivers);
+                }
+            } catch (Exception ignored) {}
+        }
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (String dId : allDriverIds) {
+            String status = activeTrips.containsKey(dId) ? "BUSY" : driverStatus.getOrDefault(dId, "AVAILABLE");
+            if (statusFilter != null && !statusFilter.isBlank() && !status.equalsIgnoreCase(statusFilter.trim())) {
+                continue;
+            }
+
+            double[] pos = lastPositions.get(dId);
+            Double lat = pos != null ? pos[0] : null;
+            Double lon = pos != null ? pos[1] : null;
+
+            if (pos == null && redisTemplate != null) {
+                try {
+                    var pointList = redisTemplate.opsForGeo().position("drivers:available", dId);
+                    if (pointList != null && !pointList.isEmpty() && pointList.get(0) != null) {
+                        lon = pointList.get(0).getX();
+                        lat = pointList.get(0).getY();
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            Instant seen = lastSeen.get(dId);
+            String lastSeenStr = seen != null ? seen.toString() : Instant.now().toString();
+
+            Map<String, Object> driverMap = new LinkedHashMap<>();
+            driverMap.put("driverId", dId);
+            driverMap.put("status", status);
+            driverMap.put("activeTrip", activeTrips.get(dId));
+            driverMap.put("pendingTrip", pendingTrips.get(dId));
+            driverMap.put("lat", lat);
+            driverMap.put("lon", lon);
+            driverMap.put("lastSeen", lastSeenStr);
+            result.add(driverMap);
+        }
+
+        int fromIndex = Math.max(0, page * size);
+        if (fromIndex >= result.size()) {
+            return List.of();
+        }
+        int toIndex = Math.min(result.size(), fromIndex + size);
+        return result.subList(fromIndex, toIndex);
+    }
+
+    /**
+     * Get detailed driver info including recent trips.
+     */
+    public Map<String, Object> getDriverDetail(String driverId) {
+        if (driverId == null || driverId.isBlank()) {
+            return null;
+        }
+
+        String status = activeTrips.containsKey(driverId) ? "BUSY" : driverStatus.getOrDefault(driverId, "OFFLINE");
+        double[] pos = lastPositions.get(driverId);
+        Double lat = pos != null ? pos[0] : null;
+        Double lon = pos != null ? pos[1] : null;
+
+        if (pos == null && redisTemplate != null) {
+            try {
+                var pointList = redisTemplate.opsForGeo().position("drivers:available", driverId);
+                if (pointList != null && !pointList.isEmpty() && pointList.get(0) != null) {
+                    lon = pointList.get(0).getX();
+                    lat = pointList.get(0).getY();
+                    if ("OFFLINE".equals(status)) {
+                        status = "AVAILABLE";
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("driverId", driverId);
+        detail.put("status", status);
+        detail.put("activeTrip", activeTrips.get(driverId));
+        detail.put("pendingTrip", pendingTrips.get(driverId));
+        detail.put("lat", lat);
+        detail.put("lon", lon);
+        detail.put("recentTrips", findTripsForDriver(driverId, 10));
+        return detail;
+    }
+
+    /**
+     * Get live positions of all active/available drivers for real-time map views.
+     */
+    public List<Map<String, Object>> getAllLivePositions() {
+        Map<String, Map<String, Object>> positionsMap = new LinkedHashMap<>();
+
+        if (redisTemplate != null) {
+            try {
+                Set<String> redisDrivers = redisTemplate.opsForZSet().range("drivers:available", 0, -1);
+                if (redisDrivers != null && !redisDrivers.isEmpty()) {
+                    for (String dId : redisDrivers) {
+                        var pointList = redisTemplate.opsForGeo().position("drivers:available", dId);
+                        if (pointList != null && !pointList.isEmpty() && pointList.get(0) != null) {
+                            String status = activeTrips.containsKey(dId) ? "BUSY" : "AVAILABLE";
+                            positionsMap.put(dId, Map.of(
+                                    "driverId", dId,
+                                    "lat", pointList.get(0).getY(),
+                                    "lon", pointList.get(0).getX(),
+                                    "status", status
+                            ));
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        for (Map.Entry<String, double[]> entry : lastPositions.entrySet()) {
+            String dId = entry.getKey();
+            double[] coords = entry.getValue();
+            String status = activeTrips.containsKey(dId) ? "BUSY" : driverStatus.getOrDefault(dId, "AVAILABLE");
+            positionsMap.put(dId, Map.of(
+                    "driverId", dId,
+                    "lat", coords[0],
+                    "lon", coords[1],
+                    "status", status
+            ));
+        }
+
+        return new ArrayList<>(positionsMap.values());
     }
 }

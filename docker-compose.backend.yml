@@ -43,6 +43,8 @@ services:
       CASSANDRA_DC: datacenter1
       KAFKA_BOOTSTRAP: kafka:29092
       GEOSPATIAL_SERVICE_URL: http://geospatial-service:8084
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
       JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC"
     deploy:
       resources:

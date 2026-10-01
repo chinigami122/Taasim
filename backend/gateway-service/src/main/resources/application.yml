@@ -52,6 +52,40 @@ spring:
                 redis-rate-limiter.burstCapacity: 40
                 key-resolver: "#{@userKeyResolver}"
 
+        # Admin routes (Slice 20)
+        - id: admin-driver
+          uri: ${DRIVER_SERVICE_URI:http://localhost:8083}
+          predicates:
+            - Path=/api/admin/drivers, /api/admin/drivers/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                key-resolver: "#{@userKeyResolver}"
+
+        - id: admin-trip
+          uri: ${TRIP_SERVICE_URI:http://localhost:8082}
+          predicates:
+            - Path=/api/admin/trips, /api/admin/trips/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                key-resolver: "#{@userKeyResolver}"
+
+        - id: admin-billing
+          uri: ${BILLING_SERVICE_URI:http://localhost:8086}
+          predicates:
+            - Path=/api/admin/billing, /api/admin/billing/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 2
+                redis-rate-limiter.burstCapacity: 5
+                key-resolver: "#{@userKeyResolver}"
+
         # Driver earnings route (billing-service)
         - id: driver-earnings
           uri: ${BILLING_SERVICE_URI:http://localhost:8086}

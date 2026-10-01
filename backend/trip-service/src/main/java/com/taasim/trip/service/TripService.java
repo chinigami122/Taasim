@@ -218,4 +218,128 @@ public class TripService {
     public Trip getTripById(String tripId) {
         return tripCache.get(tripId);
     }
+
+    /**
+     * Admin query to list trips with optional status and date filters.
+     */
+    public java.util.List<Map<String, Object>> adminListTrips(String status, String date, int limit) {
+        String bucket = (date != null && !date.isBlank())
+                ? date.trim()
+                : DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC).format(Instant.now());
+
+        java.util.List<Map<String, Object>> results = new java.util.ArrayList<>();
+        if (cassandraTemplate != null) {
+            try {
+                var rows = cassandraTemplate.getCqlOperations().queryForList(
+                        "SELECT trip_id, status, taxi_id, rider_id, eta_seconds, origin_zone, dest_zone, created_at, fare " +
+                                "FROM taasim.trips WHERE city = 'casablanca' AND date_bucket = ?",
+                        bucket
+                );
+                for (Map<String, Object> r : rows) {
+                    String tripStatus = (String) r.get("status");
+                    if (status != null && !status.isBlank() && !status.equalsIgnoreCase(tripStatus)) {
+                        continue;
+                    }
+                    Object createdAtObj = r.get("created_at");
+                    results.add(Map.of(
+                            "tripId",     r.get("trip_id") != null ? r.get("trip_id") : "",
+                            "status",     tripStatus != null ? tripStatus : "",
+                            "driverId",   r.get("taxi_id") != null ? r.get("taxi_id") : "",
+                            "riderId",    r.get("rider_id") != null ? r.get("rider_id") : "",
+                            "etaSeconds", r.get("eta_seconds") != null ? r.get("eta_seconds") : 0,
+                            "originZone", r.get("origin_zone") != null ? r.get("origin_zone") : 1,
+                            "destZone",   r.get("dest_zone") != null ? r.get("dest_zone") : 1,
+                            "createdAt",  createdAtObj != null ? createdAtObj.toString() : "",
+                            "fare",       r.get("fare") != null ? r.get("fare") : 0.0
+                    ));
+                }
+            } catch (Exception e) {
+                System.err.println("⚠️ Error querying trips from Cassandra: " + e.getMessage());
+            }
+        }
+
+        // Overlay with in-memory tripCache for the target date
+        for (Trip cached : tripCache.values()) {
+            if (bucket.equals(cached.getDateBucket())) {
+                String tripStatus = cached.getStatus();
+                if (status != null && !status.isBlank() && !status.equalsIgnoreCase(tripStatus)) {
+                    continue;
+                }
+                boolean exists = results.stream().anyMatch(m -> cached.getTripId().equals(m.get("tripId")));
+                if (!exists) {
+                    results.add(0, Map.of(
+                            "tripId",     cached.getTripId(),
+                            "status",     tripStatus != null ? tripStatus : "",
+                            "driverId",   cached.getTaxiId() != null ? cached.getTaxiId() : "",
+                            "riderId",    cached.getRiderId() != null ? cached.getRiderId() : "",
+                            "etaSeconds", cached.getEtaSeconds() != null ? cached.getEtaSeconds() : 0,
+                            "originZone", cached.getOriginZone(),
+                            "destZone",   cached.getDestZone(),
+                            "createdAt",  cached.getCreatedAt() != null ? cached.getCreatedAt().toString() : "",
+                            "fare",       cached.getFare() != null ? cached.getFare() : 0.0
+                    ));
+                }
+            }
+        }
+
+        return results.stream().limit(limit).toList();
+    }
+
+    /**
+     * Compute trip statistics for a given date.
+     */
+    public Map<String, Object> tripStatsForDate(String date) {
+        String bucket = (date != null && !date.isBlank())
+                ? date.trim()
+                : DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC).format(Instant.now());
+
+        java.util.List<Map<String, Object>> trips = adminListTrips(null, bucket, 10000);
+
+        long requested = 0;
+        long matched = 0;
+        long inProgress = 0;
+        long completed = 0;
+        long cancelled = 0;
+        long totalWaitSeconds = 0;
+        long waitCount = 0;
+
+        for (Map<String, Object> t : trips) {
+            String s = ((String) t.getOrDefault("status", "")).toUpperCase();
+            switch (s) {
+                case "REQUESTED" -> requested++;
+                case "MATCHED", "ACCEPTED" -> {
+                    matched++;
+                    int eta = (Integer) t.getOrDefault("etaSeconds", 0);
+                    if (eta > 0) {
+                        totalWaitSeconds += eta;
+                        waitCount++;
+                    }
+                }
+                case "IN_PROGRESS" -> inProgress++;
+                case "COMPLETED" -> {
+                    completed++;
+                    int eta = (Integer) t.getOrDefault("etaSeconds", 0);
+                    if (eta > 0) {
+                        totalWaitSeconds += eta;
+                        waitCount++;
+                    }
+                }
+                case "CANCELLED", "REJECTED" -> cancelled++;
+                default -> requested++;
+            }
+        }
+
+        long avgWaitSeconds = waitCount > 0 ? (totalWaitSeconds / waitCount) : 0;
+
+        return Map.of(
+                "date", bucket,
+                "totalTrips", trips.size(),
+                "requested", requested,
+                "matched", matched,
+                "inProgress", inProgress,
+                "completed", completed,
+                "cancelled", cancelled,
+                "avg_wait_seconds", avgWaitSeconds
+        );
+    }
 }
