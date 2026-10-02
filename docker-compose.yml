@@ -38,7 +38,14 @@ services:
       /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic processed.gps    --partitions 4 --replication-factor 1;
       /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic processed.demand --partitions 4 --replication-factor 1;
       /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic processed.matches --partitions 4 --replication-factor 1;
-      echo '✅ All 5 Kafka topics created successfully.';
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic trip.status       --partitions 4 --replication-factor 1;
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic trip.completed    --partitions 4 --replication-factor 1;
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic raw.trips.DLT        --partitions 4 --replication-factor 1;
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic processed.matches.DLT --partitions 4 --replication-factor 1;
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic trip.completed.DLT    --partitions 4 --replication-factor 1;
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic trip.status.DLT       --partitions 4 --replication-factor 1;
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic raw.gps.DLT          --partitions 4 --replication-factor 1;
+      echo '✅ All Kafka topics and DLTs created successfully.';
       /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list;
       "
 
@@ -201,21 +208,60 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  # ── 8. Grafana ────────────────────────────────────────────────────────
-  # grafana:
-  #   image: grafana/grafana:latest
-  #   container_name: taasim-grafana
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     GF_INSTALL_PLUGINS: hadesarchitect-cassandra-datasource
-  #     GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: hadesarchitect-cassandra-datasource
-  #     GF_SECURITY_ADMIN_PASSWORD: admin
-  #   volumes:
-  #     - ./src/grafana/provisioning:/etc/grafana/provisioning
-  #     - ./data/geo:/usr/share/grafana/public/maps/geo
-  #   depends_on:
-  #     - cassandra
+  # ── 8. Prometheus ─────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: taasim-prometheus
+    volumes:
+      - ./data/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  # ── 9. Tempo (Distributed Tracing) ────────────────────────────────────
+  tempo:
+    image: grafana/tempo:latest
+    container_name: taasim-tempo
+    command: ['-config.file=/etc/tempo.yaml']
+    volumes:
+      - ./data/tempo/tempo.yaml:/etc/tempo.yaml
+    ports:
+      - "3200:3200"
+      - "4318:4318"
+    restart: unless-stopped
+
+  # ── 10. Kafka Schema Registry ─────────────────────────────────────────
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.0
+    container_name: taasim-schema-registry
+    depends_on:
+      - kafka
+    ports:
+      - "8090:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:29092
+    restart: unless-stopped
+
+  # ── 11. Grafana ───────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: taasim-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_INSTALL_PLUGINS: hadesarchitect-cassandra-datasource
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: hadesarchitect-cassandra-datasource
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./src/grafana/provisioning:/etc/grafana/provisioning
+      - ./data/geo:/usr/share/grafana/public/maps/geo
+    depends_on:
+      - cassandra
+      - prometheus
+      - tempo
+    restart: unless-stopped
 
   # ── 9. FastAPI Backend (Soufiane) ──────────────────────────────────────
   # api:

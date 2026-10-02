@@ -3,6 +3,7 @@ package com.taasim.matching.kafka;
 import com.taasim.matching.service.MatchingEngine;
 import org.junit.jupiter.api.Test;
 import java.util.Map;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 class TripRequestConsumerTest {
@@ -70,12 +71,12 @@ class TripRequestConsumerTest {
     }
 
     @Test
-    void onTripRequest_malformedJson_doesNotThrowAndDoesNotInteract() {
+    void onTripRequest_malformedJson_throwsExceptionAndDoesNotInteract() {
         MatchingEngine matchingEngine = mock(MatchingEngine.class);
         MatchEventProducer matchEventProducer = mock(MatchEventProducer.class);
         TripRequestConsumer consumer = new TripRequestConsumer(matchingEngine, matchEventProducer);
 
-        consumer.onTripRequest("not json at all");
+        assertThrows(RuntimeException.class, () -> consumer.onTripRequest("not json at all"));
 
         verifyNoInteractions(matchingEngine, matchEventProducer);
     }

@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "RawTripRequest",
+  "namespace": "com.taasim.events",
+  "fields": [
+    {"name": "trip_id", "type": "string"},
+    {"name": "rider_id", "type": "string"},
+    {"name": "origin_zone", "type": "int"},
+    {"name": "destination_zone", "type": "int"},
+    {"name": "origin_lat", "type": ["null", "double"], "default": null},
+    {"name": "origin_lon", "type": ["null", "double"], "default": null},
+    {"name": "destination_lat", "type": ["null", "double"], "default": null},
+    {"name": "destination_lon", "type": ["null", "double"], "default": null},
+    {"name": "requested_at", "type": "long", "logicalType": "timestamp-millis"}
+  ]
+}

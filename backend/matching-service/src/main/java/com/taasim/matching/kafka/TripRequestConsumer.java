@@ -51,8 +51,9 @@ public class TripRequestConsumer {
                         destinationZone
                 );
             }
-        } catch (JsonProcessingException e) {
-            System.err.println("❌ Failed to parse trip request: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("❌ Failed to process trip request: " + e.getMessage());
+            throw new RuntimeException("Failed to process trip request", e);
         }
     }
 }

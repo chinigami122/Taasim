@@ -13,6 +13,11 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 import java.util.List;
 import java.util.Map;
 
@@ -30,16 +35,23 @@ public class MatchingEngine {
     private final ObjectMapper objectMapper;
     private final String geospatialBaseUrl;
     private final double searchRadiusMeters;
+    private final Timer matchLatency;
+    private final Counter matchNoDrivers;
 
     @Autowired
     public MatchingEngine(
             @Value("${geospatial.service.url:http://localhost:8084}") String geospatialBaseUrl,
             @Value("${matching.search-radius-meters:5000}") double searchRadiusMeters,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            @Autowired(required = false) MeterRegistry meterRegistry
     ) {
         this.geospatialBaseUrl = geospatialBaseUrl;
         this.searchRadiusMeters = searchRadiusMeters;
         this.objectMapper = objectMapper;
+
+        MeterRegistry registry = meterRegistry != null ? meterRegistry : new SimpleMeterRegistry();
+        this.matchLatency = registry.timer("taasim.match.latency");
+        this.matchNoDrivers = registry.counter("taasim.match.no_drivers_available");
 
         var requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(1500);
@@ -52,10 +64,17 @@ public class MatchingEngine {
     }
 
     public MatchingEngine(RestClient restClient, ObjectMapper objectMapper, String geospatialBaseUrl, double searchRadiusMeters) {
+        this(restClient, objectMapper, geospatialBaseUrl, searchRadiusMeters, new SimpleMeterRegistry());
+    }
+
+    public MatchingEngine(RestClient restClient, ObjectMapper objectMapper, String geospatialBaseUrl, double searchRadiusMeters, MeterRegistry meterRegistry) {
         this.restClient = restClient;
         this.objectMapper = objectMapper;
         this.geospatialBaseUrl = geospatialBaseUrl;
         this.searchRadiusMeters = searchRadiusMeters;
+        MeterRegistry registry = meterRegistry != null ? meterRegistry : new SimpleMeterRegistry();
+        this.matchLatency = registry.timer("taasim.match.latency");
+        this.matchNoDrivers = registry.counter("taasim.match.no_drivers_available");
     }
 
     /**
@@ -88,50 +107,54 @@ public class MatchingEngine {
             pickupLon = center[1];
         }
 
-        String response = restClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/internal/drivers/nearby")
-                        .queryParam("lat", pickupLat)
-                        .queryParam("lon", pickupLon)
-                        .queryParam("radius", searchRadiusMeters)
-                        .build())
-                .retrieve()
-                .body(String.class);
+        return matchLatency.record(() -> {
+            String response = restClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/internal/drivers/nearby")
+                            .queryParam("lat", pickupLat)
+                            .queryParam("lon", pickupLon)
+                            .queryParam("radius", searchRadiusMeters)
+                            .build())
+                    .retrieve()
+                    .body(String.class);
 
-        if (response == null || response.isBlank()) {
-            log.warn("❌ Empty response from geospatial service for coordinates ({}, {})", pickupLat, pickupLon);
-            return null;
-        }
-
-        try {
-            List<Map<String, Object>> drivers = objectMapper.readValue(
-                    response,
-                    new TypeReference<>() {}
-            );
-
-            if (drivers == null || drivers.isEmpty()) {
-                log.info("ℹ️ No drivers found near ({}, {}) within {}m", pickupLat, pickupLon, (int) searchRadiusMeters);
+            if (response == null || response.isBlank()) {
+                log.warn("❌ Empty response from geospatial service for coordinates ({}, {})", pickupLat, pickupLon);
+                matchNoDrivers.increment();
                 return null;
             }
 
-            // Results from Redis GEO are already sorted ascending by proximity
-            Map<String, Object> closest = drivers.get(0);
-            String driverId = (String) closest.get("driverId");
-            double distanceMeters = ((Number) closest.get("distanceMeters")).doubleValue();
-            int eta = GeoUtils.computeEta(distanceMeters);
+            try {
+                List<Map<String, Object>> drivers = objectMapper.readValue(
+                        response,
+                        new TypeReference<>() {}
+                );
 
-            log.info("✅ Matched via Redis: {} | Distance: {}m | ETA: {}s",
-                    driverId, (int) distanceMeters, eta);
+                if (drivers == null || drivers.isEmpty()) {
+                    matchNoDrivers.increment();
+                    log.info("ℹ️ No drivers found near ({}, {}) within {}m", pickupLat, pickupLon, (int) searchRadiusMeters);
+                    return null;
+                }
 
-            return Map.of(
-                    "driverId", driverId,
-                    "distanceMeters", distanceMeters,
-                    "etaSeconds", eta
-            );
-        } catch (Exception e) {
-            log.error("❌ Failed to parse geospatial response: {}", e.getMessage());
-            throw new RuntimeException("Geospatial parsing error", e);
-        }
+                // Results from Redis GEO are already sorted ascending by proximity
+                Map<String, Object> closest = drivers.get(0);
+                String driverId = (String) closest.get("driverId");
+                double distanceMeters = ((Number) closest.get("distanceMeters")).doubleValue();
+                int eta = GeoUtils.computeEta(distanceMeters);
+
+                log.info("✅ Matched via Redis: {} | Distance: {}m | ETA: {}s",
+                        driverId, (int) distanceMeters, eta);
+
+                return Map.of(
+                        "driverId", driverId,
+                        "distanceMeters", distanceMeters,
+                        "etaSeconds", eta
+                );
+            } catch (Exception e) {
+                log.error("❌ Failed to parse geospatial response: {}", e.getMessage());
+                throw new RuntimeException("Geospatial parsing error", e);
+            }
+        });
     }
 
     /**

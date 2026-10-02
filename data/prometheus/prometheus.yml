@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'taasim-services'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - 'auth-service:8081'
+          - 'trip-service:8082'
+          - 'driver-service:8083'
+          - 'geospatial-service:8084'
+          - 'matching-service:8085'
+          - 'billing-service:8086'
+          - 'gateway-service:8080'

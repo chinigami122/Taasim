@@ -7,8 +7,12 @@ import com.taasim.auth.model.Role;
 import com.taasim.auth.model.User;
 import com.taasim.auth.repository.UserRepository;
 import com.taasim.auth.security.JwtTokenProvider;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -21,12 +25,22 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final StripeCustomerService stripeCustomerService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final Counter loginFailures;
 
+    @Autowired
     public AuthService(UserRepository userRepository, JwtTokenProvider jwtTokenProvider,
-                       StripeCustomerService stripeCustomerService) {
+                       StripeCustomerService stripeCustomerService,
+                       @Autowired(required = false) MeterRegistry meterRegistry) {
         this.userRepository = userRepository;
         this.jwtTokenProvider = jwtTokenProvider;
         this.stripeCustomerService = stripeCustomerService;
+        MeterRegistry registry = meterRegistry != null ? meterRegistry : new SimpleMeterRegistry();
+        this.loginFailures = registry.counter("taasim.auth.login.failures");
+    }
+
+    public AuthService(UserRepository userRepository, JwtTokenProvider jwtTokenProvider,
+                       StripeCustomerService stripeCustomerService) {
+        this(userRepository, jwtTokenProvider, stripeCustomerService, new SimpleMeterRegistry());
     }
 
     public User register(RegisterRequest request) {
@@ -67,9 +81,13 @@ public class AuthService {
 
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> {
+                    loginFailures.increment();
+                    return new RuntimeException("User not found");
+                });
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            loginFailures.increment();
             throw new RuntimeException("Invalid password");
         }
 

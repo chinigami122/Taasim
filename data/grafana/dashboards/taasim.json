@@ -1,0 +1,185 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "System Overview & Traffic",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth" },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "id": 1,
+      "title": "HTTP Request Rate by Service",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count[1m])) by (job, uri)",
+          "legendFormat": "{{job}} - {{uri}}"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth" },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "id": 2,
+      "title": "HTTP Request p95 Latency",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket[1m])) by (le, job))",
+          "legendFormat": "p95 {{job}}"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "id": 101,
+      "title": "JVM & Infrastructure Health",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line" },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "id": 3,
+      "title": "JVM Heap Memory Used",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{area=\"heap\"}",
+          "legendFormat": "{{job}}"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line" },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "id": 4,
+      "title": "JVM Process CPU Usage",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "process_cpu_usage",
+          "legendFormat": "{{job}}"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "id": 102,
+      "title": "Business Metrics & Operations",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "none" }
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 19 },
+      "id": 5,
+      "title": "Trips Created",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(taasim_trips_created_total) or vector(0)",
+          "legendFormat": "Total Trips"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "currencyMAD" }
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 19 },
+      "id": 6,
+      "title": "Total Billed Fare (MAD)",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(taasim_billing_total_fare_total) or vector(0)",
+          "legendFormat": "Fare Revenue"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 19 },
+      "id": 7,
+      "title": "Matching Engine Latency (p95)",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "taasim_match_latency_seconds_max or vector(0)",
+          "legendFormat": "Max Latency"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "none" }
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 19 },
+      "id": 8,
+      "title": "Auth Login Failures",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(taasim_auth_login_failures_total) or vector(0)",
+          "legendFormat": "Failures"
+        }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["taasim", "observability", "prometheus", "tempo"],
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "title": "TaaSim Microservices Observability",
+  "uid": "taasim-observability",
+  "version": 1
+}

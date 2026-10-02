@@ -5,6 +5,10 @@ import com.taasim.trip.dto.TripRequestDto;
 import com.taasim.trip.kafka.TripEventProducer;
 import com.taasim.trip.model.Trip;
 import com.taasim.trip.repository.TripRepository;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.cassandra.core.CassandraTemplate;
 import org.springframework.stereotype.Service;
 
@@ -22,12 +26,22 @@ public class TripService {
     private final TripEventProducer tripEventProducer;
     private final CassandraTemplate cassandraTemplate;
     private final Map<String, Trip> tripCache = new ConcurrentHashMap<>();
+    private final Counter tripsCreated;
 
+    @Autowired
     public TripService(TripRepository tripRepository, TripEventProducer tripEventProducer,
-                       CassandraTemplate cassandraTemplate) {
+                       CassandraTemplate cassandraTemplate,
+                       @Autowired(required = false) MeterRegistry meterRegistry) {
         this.tripRepository = tripRepository;
         this.tripEventProducer = tripEventProducer;
         this.cassandraTemplate = cassandraTemplate;
+        MeterRegistry registry = meterRegistry != null ? meterRegistry : new SimpleMeterRegistry();
+        this.tripsCreated = registry.counter("taasim.trips.created");
+    }
+
+    public TripService(TripRepository tripRepository, TripEventProducer tripEventProducer,
+                       CassandraTemplate cassandraTemplate) {
+        this(tripRepository, tripEventProducer, cassandraTemplate, new SimpleMeterRegistry());
     }
 
     /**
@@ -90,6 +104,7 @@ public class TripService {
                 + originZone + " → Zone " + destZone
                 + (request.getOriginLat() != null ? " (GPS: " + request.getOriginLat() + ", " + request.getOriginLon() + ")" : ""));
 
+        tripsCreated.increment();
         return trip;
     }
 

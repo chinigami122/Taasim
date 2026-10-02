@@ -32,6 +32,7 @@ public class TripStatusConsumer {
             System.out.println("🔄 Trip " + tripId + " → " + status);
         } catch (Exception e) {
             System.err.println("❌ Failed to process trip status: " + e.getMessage());
+            throw new RuntimeException("Failed to process trip status", e);
         }
     }
 }

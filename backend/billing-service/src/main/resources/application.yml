@@ -75,10 +75,16 @@ management:
   endpoints:
     web:
       exposure:
-        include: ${ACTUATOR_ENDPOINTS:health,info,metrics}
+        include: ${ACTUATOR_ENDPOINTS:health,info,metrics,prometheus}
   endpoint:
     health:
       show-details: always
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTLP_ENDPOINT:http://tempo:4318/v1/traces}
 
 jwt:
   secret: ${JWT_SECRET:dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}

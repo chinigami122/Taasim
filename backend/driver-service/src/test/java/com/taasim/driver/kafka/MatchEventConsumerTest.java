@@ -2,6 +2,7 @@ package com.taasim.driver.kafka;
 
 import com.taasim.driver.service.DriverService;
 import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 class MatchEventConsumerTest {
@@ -21,21 +22,21 @@ class MatchEventConsumerTest {
     }
 
     @Test
-    void onMatch_malformedJson_doesNotThrow() {
+    void onMatch_malformedJson_throwsException() {
         DriverService driverService = mock(DriverService.class);
         MatchEventConsumer consumer = new MatchEventConsumer(driverService);
 
-        consumer.onMatch("not json at all");
+        assertThrows(RuntimeException.class, () -> consumer.onMatch("not json at all"));
 
         verifyNoInteractions(driverService);
     }
 
     @Test
-    void onMatch_missingField_doesNotThrow() {
+    void onMatch_missingField_throwsException() {
         DriverService driverService = mock(DriverService.class);
         MatchEventConsumer consumer = new MatchEventConsumer(driverService);
 
-        consumer.onMatch("{\"trip_id\":\"abc\"}");
+        assertThrows(RuntimeException.class, () -> consumer.onMatch("{\"trip_id\":\"abc\"}"));
 
         verifyNoInteractions(driverService);
     }

@@ -1,0 +1,12 @@
+{
+  "type": "record",
+  "name": "RawGpsPing",
+  "namespace": "com.taasim.events",
+  "fields": [
+    {"name": "driver_id", "type": "string"},
+    {"name": "lat", "type": "double"},
+    {"name": "lon", "type": "double"},
+    {"name": "speed", "type": "double"},
+    {"name": "timestamp", "type": "long", "logicalType": "timestamp-millis"}
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "TripCompleted",
+  "namespace": "com.taasim.events",
+  "fields": [
+    {"name": "trip_id", "type": "string"},
+    {"name": "driver_id", "type": "string"},
+    {"name": "client_id", "type": "string"},
+    {"name": "distance_km", "type": "double"},
+    {"name": "duration_min", "type": "double"},
+    {"name": "completed_at", "type": "long", "logicalType": "timestamp-millis"}
+  ]
+}

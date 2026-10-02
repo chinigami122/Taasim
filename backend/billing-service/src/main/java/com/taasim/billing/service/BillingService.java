@@ -4,6 +4,10 @@ import com.taasim.billing.model.BillingRecord;
 import com.taasim.billing.repository.BillingRecordRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,17 +27,30 @@ public class BillingService {
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final StripeChargeService stripeChargeService;
     private final ClientLookupService clientLookupService;
+    private final Counter totalFareCounter;
+
+    @Autowired
+    public BillingService(BillingRecordRepository repo,
+                          FareCalculator calculator,
+                          KafkaTemplate<String, Object> kafkaTemplate,
+                          StripeChargeService stripeChargeService,
+                          ClientLookupService clientLookupService,
+                          @Autowired(required = false) MeterRegistry meterRegistry) {
+        this.repo = repo;
+        this.calculator = calculator;
+        this.kafkaTemplate = kafkaTemplate;
+        this.stripeChargeService = stripeChargeService;
+        this.clientLookupService = clientLookupService;
+        MeterRegistry registry = meterRegistry != null ? meterRegistry : new SimpleMeterRegistry();
+        this.totalFareCounter = registry.counter("taasim.billing.total_fare");
+    }
 
     public BillingService(BillingRecordRepository repo,
                           FareCalculator calculator,
                           KafkaTemplate<String, Object> kafkaTemplate,
                           StripeChargeService stripeChargeService,
                           ClientLookupService clientLookupService) {
-        this.repo = repo;
-        this.calculator = calculator;
-        this.kafkaTemplate = kafkaTemplate;
-        this.stripeChargeService = stripeChargeService;
-        this.clientLookupService = clientLookupService;
+        this(repo, calculator, kafkaTemplate, stripeChargeService, clientLookupService, new SimpleMeterRegistry());
     }
 
     @Transactional
@@ -50,6 +67,7 @@ public class BillingService {
         }
 
         var fare = calculator.calculate(distanceKm, durationMin, surge);
+        totalFareCounter.increment(fare.totalFare().doubleValue());
 
         BillingRecord r = new BillingRecord();
         r.setTripId(tripId);

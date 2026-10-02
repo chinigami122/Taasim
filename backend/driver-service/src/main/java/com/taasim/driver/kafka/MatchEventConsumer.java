@@ -38,6 +38,7 @@ public class MatchEventConsumer {
             System.out.println("📥 Trip assigned to driver " + driverId + ": " + tripId + " (client=" + clientId + ")");
         } catch (Exception e) {
             System.err.println("❌ Failed to process match: " + e.getMessage());
+            throw new RuntimeException("Failed to process match", e);
         }
     }
 }

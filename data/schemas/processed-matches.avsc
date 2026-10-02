@@ -1,0 +1,14 @@
+{
+  "type": "record",
+  "name": "MatchEvent",
+  "namespace": "com.taasim.events",
+  "fields": [
+    {"name": "trip_id", "type": "string"},
+    {"name": "driver_id", "type": "string"},
+    {"name": "rider_id", "type": "string"},
+    {"name": "distance_meters", "type": "double"},
+    {"name": "eta_seconds", "type": "int"},
+    {"name": "origin_zone", "type": "int"},
+    {"name": "destination_zone", "type": "int"}
+  ]
+}

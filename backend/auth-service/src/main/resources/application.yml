@@ -42,4 +42,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: ${ACTUATOR_ENDPOINTS:health,info}
+        include: ${ACTUATOR_ENDPOINTS:health,info,metrics,prometheus}
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTLP_ENDPOINT:http://tempo:4318/v1/traces}
