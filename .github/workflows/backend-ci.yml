@@ -33,7 +33,7 @@ jobs:
         working-directory: backend
         run: mvn -B test
 
-      - name: Integration tests
+      - name: Integration tests & Package
         working-directory: backend
         run: mvn -B verify -DskipUTs=true
         # Testcontainers starts Docker containers natively on GitHub-hosted runners
@@ -44,6 +44,14 @@ jobs:
         with:
           name: surefire-reports
           path: backend/**/target/surefire-reports/
+
+      - name: Upload built JARs
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jars
+          path: |
+            backend/*/target/*.jar
+            !backend/*/target/*-tests.jar
 
   docker-build:
     needs: build-and-test
@@ -56,9 +64,17 @@ jobs:
           - matching-service
           - auth-service
           - gateway-service
+          - geospatial-service
+          - billing-service
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download built JARs
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-jars
+          path: backend
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -88,9 +104,17 @@ jobs:
           - matching-service
           - auth-service
           - gateway-service
+          - geospatial-service
+          - billing-service
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download built JARs
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-jars
+          path: backend
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
