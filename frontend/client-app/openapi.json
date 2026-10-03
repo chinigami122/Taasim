@@ -1,0 +1,1801 @@
+﻿{
+    "openapi":  "3.0.1",
+    "info":  {
+                 "title":  "TaaSim Platform API",
+                 "description":  "Unified OpenAPI specification for TaaSim ride-hailing platform",
+                 "version":  "1.0.0"
+             },
+    "servers":  [
+                    {
+                        "url":  "http://localhost:8080",
+                        "description":  "API Gateway"
+                    }
+                ],
+    "tags":  [
+                 {
+                     "name":  "Authentication",
+                     "description":  "User registration and login endpoints"
+                 },
+                 {
+                     "name":  "Internal User",
+                     "description":  "Internal service-to-service endpoints"
+                 },
+                 {
+                     "name":  "Admin Trips",
+                     "description":  "Admin trip history and operational analytics endpoints"
+                 },
+                 {
+                     "name":  "Trips",
+                     "description":  "Trip request and lifecycle management"
+                 },
+                 {
+                     "name":  "Admin Drivers",
+                     "description":  "Admin driver management and live tracking endpoints"
+                 },
+                 {
+                     "name":  "Drivers",
+                     "description":  "Driver telemetry and trip lifecycle management"
+                 },
+                 {
+                     "name":  "Admin Billing",
+                     "description":  "Admin financial analytics and top driver leaderboards"
+                 },
+                 {
+                     "name":  "Stripe Webhook",
+                     "description":  "Asynchronous payment webhook receiver"
+                 },
+                 {
+                     "name":  "Driver Earnings",
+                     "description":  "Driver payout and earnings summary"
+                 },
+                 {
+                     "name":  "Billing",
+                     "description":  "Fare calculation and trip billing records"
+                 }
+             ],
+    "paths":  {
+                  "/api/auth/register":  {
+                                             "post":  {
+                                                          "tags":  [
+                                                                       "Authentication"
+                                                                   ],
+                                                          "summary":  "Register a new user",
+                                                          "description":  "Creates a new user account with hashed password.",
+                                                          "operationId":  "register",
+                                                          "requestBody":  {
+                                                                              "content":  {
+                                                                                              "application/json":  {
+                                                                                                                       "schema":  {
+                                                                                                                                      "$ref":  "#/components/schemas/RegisterRequest"
+                                                                                                                                  }
+                                                                                                                   }
+                                                                                          },
+                                                                              "required":  true
+                                                                          },
+                                                          "responses":  {
+                                                                            "200":  {
+                                                                                        "description":  "User successfully registered",
+                                                                                        "content":  {
+                                                                                                        "*/*":  {
+                                                                                                                    "schema":  {
+                                                                                                                                   "type":  "object"
+                                                                                                                               }
+                                                                                                                }
+                                                                                                    }
+                                                                                    },
+                                                                            "400":  {
+                                                                                        "description":  "Validation error or duplicate email",
+                                                                                        "content":  {
+                                                                                                        "*/*":  {
+                                                                                                                    "schema":  {
+                                                                                                                                   "type":  "object"
+                                                                                                                               }
+                                                                                                                }
+                                                                                                    }
+                                                                                    }
+                                                                        }
+                                                      }
+                                         },
+                  "/api/auth/login":  {
+                                          "post":  {
+                                                       "tags":  [
+                                                                    "Authentication"
+                                                                ],
+                                                       "summary":  "Authenticate user and get JWT",
+                                                       "description":  "Validates credentials and returns a signed JWT token.",
+                                                       "operationId":  "login",
+                                                       "requestBody":  {
+                                                                           "content":  {
+                                                                                           "application/json":  {
+                                                                                                                    "schema":  {
+                                                                                                                                   "$ref":  "#/components/schemas/LoginRequest"
+                                                                                                                               }
+                                                                                                                }
+                                                                                       },
+                                                                           "required":  true
+                                                                       },
+                                                       "responses":  {
+                                                                         "401":  {
+                                                                                     "description":  "Invalid email or password",
+                                                                                     "content":  {
+                                                                                                     "*/*":  {
+                                                                                                                 "schema":  {
+                                                                                                                                "type":  "object"
+                                                                                                                            }
+                                                                                                             }
+                                                                                                 }
+                                                                                 },
+                                                                         "200":  {
+                                                                                     "description":  "Login successful, returns Bearer token",
+                                                                                     "content":  {
+                                                                                                     "*/*":  {
+                                                                                                                 "schema":  {
+                                                                                                                                "type":  "object"
+                                                                                                                            }
+                                                                                                             }
+                                                                                                 }
+                                                                                 }
+                                                                     }
+                                                   }
+                                      },
+                  "/api/internal/users/{id}/stripe-customer":  {
+                                                                   "get":  {
+                                                                               "tags":  [
+                                                                                            "Internal User"
+                                                                                        ],
+                                                                               "summary":  "Get Stripe customer ID for a user",
+                                                                               "description":  "Used by billing-service to charge clients",
+                                                                               "operationId":  "getStripeCustomerId",
+                                                                               "parameters":  [
+                                                                                                  {
+                                                                                                      "name":  "id",
+                                                                                                      "in":  "path",
+                                                                                                      "required":  true,
+                                                                                                      "schema":  {
+                                                                                                                     "type":  "string"
+                                                                                                                 }
+                                                                                                  }
+                                                                                              ],
+                                                                               "responses":  {
+                                                                                                 "200":  {
+                                                                                                             "description":  "OK",
+                                                                                                             "content":  {
+                                                                                                                             "*/*":  {
+                                                                                                                                         "schema":  {
+                                                                                                                                                        "type":  "object"
+                                                                                                                                                    }
+                                                                                                                                     }
+                                                                                                                         }
+                                                                                                         }
+                                                                                             }
+                                                                           }
+                                                               },
+                  "/api/trips/request":  {
+                                             "post":  {
+                                                          "tags":  [
+                                                                       "Trips"
+                                                                   ],
+                                                          "summary":  "Request a new trip",
+                                                          "description":  "Creates a REQUESTED trip and publishes it to Kafka for driver matching.",
+                                                          "operationId":  "requestTrip",
+                                                          "parameters":  [
+                                                                             {
+                                                                                 "name":  "X-User-Id",
+                                                                                 "in":  "header",
+                                                                                 "required":  false,
+                                                                                 "schema":  {
+                                                                                                "type":  "string"
+                                                                                            }
+                                                                             }
+                                                                         ],
+                                                          "requestBody":  {
+                                                                              "content":  {
+                                                                                              "application/json":  {
+                                                                                                                       "schema":  {
+                                                                                                                                      "$ref":  "#/components/schemas/TripRequestDto"
+                                                                                                                                  }
+                                                                                                                   }
+                                                                                          },
+                                                                              "required":  true
+                                                                          },
+                                                          "responses":  {
+                                                                            "400":  {
+                                                                                        "description":  "Invalid request payload",
+                                                                                        "content":  {
+                                                                                                        "*/*":  {
+                                                                                                                    "schema":  {
+                                                                                                                                   "type":  "object",
+                                                                                                                                   "additionalProperties":  {
+                                                                                                                                                                "type":  "object"
+                                                                                                                                                            }
+                                                                                                                               }
+                                                                                                                }
+                                                                                                    }
+                                                                                    },
+                                                                            "403":  {
+                                                                                        "description":  "Insufficient role (requires CLIENT)",
+                                                                                        "content":  {
+                                                                                                        "*/*":  {
+                                                                                                                    "schema":  {
+                                                                                                                                   "type":  "object",
+                                                                                                                                   "additionalProperties":  {
+                                                                                                                                                                "type":  "object"
+                                                                                                                                                            }
+                                                                                                                               }
+                                                                                                                }
+                                                                                                    }
+                                                                                    },
+                                                                            "401":  {
+                                                                                        "description":  "Missing or invalid JWT",
+                                                                                        "content":  {
+                                                                                                        "*/*":  {
+                                                                                                                    "schema":  {
+                                                                                                                                   "type":  "object",
+                                                                                                                                   "additionalProperties":  {
+                                                                                                                                                                "type":  "object"
+                                                                                                                                                            }
+                                                                                                                               }
+                                                                                                                }
+                                                                                                    }
+                                                                                    },
+                                                                            "200":  {
+                                                                                        "description":  "Trip created and submitted for matching",
+                                                                                        "content":  {
+                                                                                                        "*/*":  {
+                                                                                                                    "schema":  {
+                                                                                                                                   "type":  "object",
+                                                                                                                                   "additionalProperties":  {
+                                                                                                                                                                "type":  "object"
+                                                                                                                                                            }
+                                                                                                                               }
+                                                                                                                }
+                                                                                                    }
+                                                                                    }
+                                                                        },
+                                                          "security":  [
+                                                                           {
+                                                                               "bearerAuth":  [
+
+                                                                                              ]
+                                                                           }
+                                                                       ]
+                                                      }
+                                         },
+                  "/api/trips/{tripId}":  {
+                                              "get":  {
+                                                          "tags":  [
+                                                                       "Trips"
+                                                                   ],
+                                                          "summary":  "Get current trip status",
+                                                          "description":  "Retrieves real-time trip status, matched driver, and estimated time of arrival.",
+                                                          "operationId":  "getTrip",
+                                                          "parameters":  [
+                                                                             {
+                                                                                 "name":  "tripId",
+                                                                                 "in":  "path",
+                                                                                 "description":  "Trip unique identifier (UUID)",
+                                                                                 "required":  true,
+                                                                                 "schema":  {
+                                                                                                "type":  "string"
+                                                                                            },
+                                                                                 "example":  "4e3415c1-3fbe-497b-8bb5-5d462fa9c207"
+                                                                             }
+                                                                         ],
+                                                          "responses":  {
+                                                                            "401":  {
+                                                                                        "description":  "Missing or invalid JWT",
+                                                                                        "content":  {
+                                                                                                        "*/*":  {
+                                                                                                                    "schema":  {
+                                                                                                                                   "type":  "object"
+                                                                                                                               }
+                                                                                                                }
+                                                                                                    }
+                                                                                    },
+                                                                            "200":  {
+                                                                                        "description":  "Trip found",
+                                                                                        "content":  {
+                                                                                                        "*/*":  {
+                                                                                                                    "schema":  {
+                                                                                                                                   "type":  "object"
+                                                                                                                               }
+                                                                                                                }
+                                                                                                    }
+                                                                                    },
+                                                                            "404":  {
+                                                                                        "description":  "Trip not found",
+                                                                                        "content":  {
+                                                                                                        "*/*":  {
+                                                                                                                    "schema":  {
+                                                                                                                                   "type":  "object"
+                                                                                                                               }
+                                                                                                                }
+                                                                                                    }
+                                                                                    }
+                                                                        },
+                                                          "security":  [
+                                                                           {
+                                                                               "bearerAuth":  [
+
+                                                                                              ]
+                                                                           }
+                                                                       ]
+                                                      }
+                                          },
+                  "/api/trips/history":  {
+                                             "get":  {
+                                                         "tags":  [
+                                                                      "Trips"
+                                                                  ],
+                                                         "summary":  "List trips for the authenticated user",
+                                                         "operationId":  "getMyTrips",
+                                                         "parameters":  [
+                                                                            {
+                                                                                "name":  "X-User-Id",
+                                                                                "in":  "header",
+                                                                                "required":  false,
+                                                                                "schema":  {
+                                                                                               "type":  "string"
+                                                                                           }
+                                                                            },
+                                                                            {
+                                                                                "name":  "limit",
+                                                                                "in":  "query",
+                                                                                "required":  false,
+                                                                                "schema":  {
+                                                                                               "type":  "integer",
+                                                                                               "format":  "int32",
+                                                                                               "default":  20
+                                                                                           }
+                                                                            },
+                                                                            {
+                                                                                "name":  "fromDate",
+                                                                                "in":  "query",
+                                                                                "required":  false,
+                                                                                "schema":  {
+                                                                                               "type":  "string"
+                                                                                           }
+                                                                            }
+                                                                        ],
+                                                         "responses":  {
+                                                                           "200":  {
+                                                                                       "description":  "OK",
+                                                                                       "content":  {
+                                                                                                       "*/*":  {
+                                                                                                                   "schema":  {
+                                                                                                                                  "type":  "object"
+                                                                                                                              }
+                                                                                                               }
+                                                                                                   }
+                                                                                   }
+                                                                       },
+                                                         "security":  [
+                                                                          {
+                                                                              "bearerAuth":  [
+
+                                                                                             ]
+                                                                          }
+                                                                      ]
+                                                     }
+                                         },
+                  "/api/admin/trips":  {
+                                           "get":  {
+                                                       "tags":  [
+                                                                    "Admin Trips"
+                                                                ],
+                                                       "summary":  "List trips with status, date, and limit filters",
+                                                       "operationId":  "listTrips",
+                                                       "parameters":  [
+                                                                          {
+                                                                              "name":  "status",
+                                                                              "in":  "query",
+                                                                              "required":  false,
+                                                                              "schema":  {
+                                                                                             "type":  "string"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "name":  "date",
+                                                                              "in":  "query",
+                                                                              "required":  false,
+                                                                              "schema":  {
+                                                                                             "type":  "string"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "name":  "limit",
+                                                                              "in":  "query",
+                                                                              "required":  false,
+                                                                              "schema":  {
+                                                                                             "type":  "integer",
+                                                                                             "format":  "int32",
+                                                                                             "default":  50
+                                                                                         }
+                                                                          }
+                                                                      ],
+                                                       "responses":  {
+                                                                         "200":  {
+                                                                                     "description":  "OK",
+                                                                                     "content":  {
+                                                                                                     "*/*":  {
+                                                                                                                 "schema":  {
+                                                                                                                                "type":  "object"
+                                                                                                                            }
+                                                                                                             }
+                                                                                                 }
+                                                                                 }
+                                                                     }
+                                                   }
+                                       },
+                  "/api/admin/trips/stats":  {
+                                                 "get":  {
+                                                             "tags":  [
+                                                                          "Admin Trips"
+                                                                      ],
+                                                             "summary":  "Get trip operational KPIs and breakdown for a given date",
+                                                             "operationId":  "stats",
+                                                             "parameters":  [
+                                                                                {
+                                                                                    "name":  "date",
+                                                                                    "in":  "query",
+                                                                                    "required":  false,
+                                                                                    "schema":  {
+                                                                                                   "type":  "string"
+                                                                                               }
+                                                                                }
+                                                                            ],
+                                                             "responses":  {
+                                                                               "200":  {
+                                                                                           "description":  "OK",
+                                                                                           "content":  {
+                                                                                                           "*/*":  {
+                                                                                                                       "schema":  {
+                                                                                                                                      "type":  "object"
+                                                                                                                                  }
+                                                                                                                   }
+                                                                                                       }
+                                                                                       }
+                                                                           }
+                                                         }
+                                             },
+                  "/api/drivers/trips/{driverId}/start":  {
+                                                              "put":  {
+                                                                          "tags":  [
+                                                                                       "Drivers"
+                                                                                   ],
+                                                                          "summary":  "Start active ride",
+                                                                          "description":  "Driver picks up rider and marks trip as STARTED.",
+                                                                          "operationId":  "startRide",
+                                                                          "parameters":  [
+                                                                                             {
+                                                                                                 "name":  "driverId",
+                                                                                                 "in":  "path",
+                                                                                                 "description":  "Driver identifier",
+                                                                                                 "required":  true,
+                                                                                                 "schema":  {
+                                                                                                                "type":  "string"
+                                                                                                            },
+                                                                                                 "example":  "taxi_001"
+                                                                                             }
+                                                                                         ],
+                                                                          "responses":  {
+                                                                                            "403":  {
+                                                                                                        "description":  "Insufficient role (requires DRIVER)",
+                                                                                                        "content":  {
+                                                                                                                        "*/*":  {
+                                                                                                                                    "schema":  {
+                                                                                                                                                   "type":  "object",
+                                                                                                                                                   "additionalProperties":  {
+                                                                                                                                                                                "type":  "object"
+                                                                                                                                                                            }
+                                                                                                                                               }
+                                                                                                                                }
+                                                                                                                    }
+                                                                                                    },
+                                                                                            "401":  {
+                                                                                                        "description":  "Missing or invalid JWT",
+                                                                                                        "content":  {
+                                                                                                                        "*/*":  {
+                                                                                                                                    "schema":  {
+                                                                                                                                                   "type":  "object",
+                                                                                                                                                   "additionalProperties":  {
+                                                                                                                                                                                "type":  "object"
+                                                                                                                                                                            }
+                                                                                                                                               }
+                                                                                                                                }
+                                                                                                                    }
+                                                                                                    },
+                                                                                            "200":  {
+                                                                                                        "description":  "Ride started",
+                                                                                                        "content":  {
+                                                                                                                        "*/*":  {
+                                                                                                                                    "schema":  {
+                                                                                                                                                   "type":  "object",
+                                                                                                                                                   "additionalProperties":  {
+                                                                                                                                                                                "type":  "object"
+                                                                                                                                                                            }
+                                                                                                                                               }
+                                                                                                                                }
+                                                                                                                    }
+                                                                                                    },
+                                                                                            "400":  {
+                                                                                                        "description":  "No active trip for this driver",
+                                                                                                        "content":  {
+                                                                                                                        "*/*":  {
+                                                                                                                                    "schema":  {
+                                                                                                                                                   "type":  "object",
+                                                                                                                                                   "additionalProperties":  {
+                                                                                                                                                                                "type":  "object"
+                                                                                                                                                                            }
+                                                                                                                                               }
+                                                                                                                                }
+                                                                                                                    }
+                                                                                                    }
+                                                                                        },
+                                                                          "security":  [
+                                                                                           {
+                                                                                               "bearerAuth":  [
+
+                                                                                                              ]
+                                                                                           }
+                                                                                       ]
+                                                                      }
+                                                          },
+                  "/api/drivers/trips/{driverId}/reject":  {
+                                                               "put":  {
+                                                                           "tags":  [
+                                                                                        "Drivers"
+                                                                                    ],
+                                                                           "summary":  "Reject matched trip",
+                                                                           "description":  "Driver rejects an assigned trip match.",
+                                                                           "operationId":  "rejectTrip",
+                                                                           "parameters":  [
+                                                                                              {
+                                                                                                  "name":  "driverId",
+                                                                                                  "in":  "path",
+                                                                                                  "description":  "Driver identifier",
+                                                                                                  "required":  true,
+                                                                                                  "schema":  {
+                                                                                                                 "type":  "string"
+                                                                                                             },
+                                                                                                  "example":  "taxi_001"
+                                                                                              }
+                                                                                          ],
+                                                                           "responses":  {
+                                                                                             "200":  {
+                                                                                                         "description":  "Trip rejected",
+                                                                                                         "content":  {
+                                                                                                                         "*/*":  {
+                                                                                                                                     "schema":  {
+                                                                                                                                                    "type":  "object",
+                                                                                                                                                    "additionalProperties":  {
+                                                                                                                                                                                 "type":  "object"
+                                                                                                                                                                             }
+                                                                                                                                                }
+                                                                                                                                 }
+                                                                                                                     }
+                                                                                                     },
+                                                                                             "403":  {
+                                                                                                         "description":  "Insufficient role (requires DRIVER)",
+                                                                                                         "content":  {
+                                                                                                                         "*/*":  {
+                                                                                                                                     "schema":  {
+                                                                                                                                                    "type":  "object",
+                                                                                                                                                    "additionalProperties":  {
+                                                                                                                                                                                 "type":  "object"
+                                                                                                                                                                             }
+                                                                                                                                                }
+                                                                                                                                 }
+                                                                                                                     }
+                                                                                                     },
+                                                                                             "400":  {
+                                                                                                         "description":  "No pending trip for this driver",
+                                                                                                         "content":  {
+                                                                                                                         "*/*":  {
+                                                                                                                                     "schema":  {
+                                                                                                                                                    "type":  "object",
+                                                                                                                                                    "additionalProperties":  {
+                                                                                                                                                                                 "type":  "object"
+                                                                                                                                                                             }
+                                                                                                                                                }
+                                                                                                                                 }
+                                                                                                                     }
+                                                                                                     },
+                                                                                             "401":  {
+                                                                                                         "description":  "Missing or invalid JWT",
+                                                                                                         "content":  {
+                                                                                                                         "*/*":  {
+                                                                                                                                     "schema":  {
+                                                                                                                                                    "type":  "object",
+                                                                                                                                                    "additionalProperties":  {
+                                                                                                                                                                                 "type":  "object"
+                                                                                                                                                                             }
+                                                                                                                                                }
+                                                                                                                                 }
+                                                                                                                     }
+                                                                                                     }
+                                                                                         },
+                                                                           "security":  [
+                                                                                            {
+                                                                                                "bearerAuth":  [
+
+                                                                                                               ]
+                                                                                            }
+                                                                                        ]
+                                                                       }
+                                                           },
+                  "/api/drivers/trips/{driverId}/complete":  {
+                                                                 "put":  {
+                                                                             "tags":  [
+                                                                                          "Drivers"
+                                                                                      ],
+                                                                             "summary":  "Complete active ride",
+                                                                             "description":  "Driver drops off rider and marks trip as COMPLETED.",
+                                                                             "operationId":  "completeRide",
+                                                                             "parameters":  [
+                                                                                                {
+                                                                                                    "name":  "driverId",
+                                                                                                    "in":  "path",
+                                                                                                    "description":  "Driver identifier",
+                                                                                                    "required":  true,
+                                                                                                    "schema":  {
+                                                                                                                   "type":  "string"
+                                                                                                               },
+                                                                                                    "example":  "taxi_001"
+                                                                                                }
+                                                                                            ],
+                                                                             "responses":  {
+                                                                                               "403":  {
+                                                                                                           "description":  "Insufficient role (requires DRIVER)",
+                                                                                                           "content":  {
+                                                                                                                           "*/*":  {
+                                                                                                                                       "schema":  {
+                                                                                                                                                      "type":  "object",
+                                                                                                                                                      "additionalProperties":  {
+                                                                                                                                                                                   "type":  "object"
+                                                                                                                                                                               }
+                                                                                                                                                  }
+                                                                                                                                   }
+                                                                                                                       }
+                                                                                                       },
+                                                                                               "200":  {
+                                                                                                           "description":  "Ride completed",
+                                                                                                           "content":  {
+                                                                                                                           "*/*":  {
+                                                                                                                                       "schema":  {
+                                                                                                                                                      "type":  "object",
+                                                                                                                                                      "additionalProperties":  {
+                                                                                                                                                                                   "type":  "object"
+                                                                                                                                                                               }
+                                                                                                                                                  }
+                                                                                                                                   }
+                                                                                                                       }
+                                                                                                       },
+                                                                                               "401":  {
+                                                                                                           "description":  "Missing or invalid JWT",
+                                                                                                           "content":  {
+                                                                                                                           "*/*":  {
+                                                                                                                                       "schema":  {
+                                                                                                                                                      "type":  "object",
+                                                                                                                                                      "additionalProperties":  {
+                                                                                                                                                                                   "type":  "object"
+                                                                                                                                                                               }
+                                                                                                                                                  }
+                                                                                                                                   }
+                                                                                                                       }
+                                                                                                       },
+                                                                                               "400":  {
+                                                                                                           "description":  "No active trip for this driver",
+                                                                                                           "content":  {
+                                                                                                                           "*/*":  {
+                                                                                                                                       "schema":  {
+                                                                                                                                                      "type":  "object",
+                                                                                                                                                      "additionalProperties":  {
+                                                                                                                                                                                   "type":  "object"
+                                                                                                                                                                               }
+                                                                                                                                                  }
+                                                                                                                                   }
+                                                                                                                       }
+                                                                                                       }
+                                                                                           },
+                                                                             "security":  [
+                                                                                              {
+                                                                                                  "bearerAuth":  [
+
+                                                                                                                 ]
+                                                                                              }
+                                                                                          ]
+                                                                         }
+                                                             },
+                  "/api/drivers/trips/{driverId}/accept":  {
+                                                               "put":  {
+                                                                           "tags":  [
+                                                                                        "Drivers"
+                                                                                    ],
+                                                                           "summary":  "Accept matched trip",
+                                                                           "description":  "Driver accepts an assigned trip match.",
+                                                                           "operationId":  "acceptTrip",
+                                                                           "parameters":  [
+                                                                                              {
+                                                                                                  "name":  "driverId",
+                                                                                                  "in":  "path",
+                                                                                                  "description":  "Driver identifier",
+                                                                                                  "required":  true,
+                                                                                                  "schema":  {
+                                                                                                                 "type":  "string"
+                                                                                                             },
+                                                                                                  "example":  "taxi_001"
+                                                                                              }
+                                                                                          ],
+                                                                           "responses":  {
+                                                                                             "200":  {
+                                                                                                         "description":  "Trip accepted",
+                                                                                                         "content":  {
+                                                                                                                         "*/*":  {
+                                                                                                                                     "schema":  {
+                                                                                                                                                    "type":  "object",
+                                                                                                                                                    "additionalProperties":  {
+                                                                                                                                                                                 "type":  "object"
+                                                                                                                                                                             }
+                                                                                                                                                }
+                                                                                                                                 }
+                                                                                                                     }
+                                                                                                     },
+                                                                                             "403":  {
+                                                                                                         "description":  "Insufficient role (requires DRIVER)",
+                                                                                                         "content":  {
+                                                                                                                         "*/*":  {
+                                                                                                                                     "schema":  {
+                                                                                                                                                    "type":  "object",
+                                                                                                                                                    "additionalProperties":  {
+                                                                                                                                                                                 "type":  "object"
+                                                                                                                                                                             }
+                                                                                                                                                }
+                                                                                                                                 }
+                                                                                                                     }
+                                                                                                     },
+                                                                                             "400":  {
+                                                                                                         "description":  "No pending trip for this driver",
+                                                                                                         "content":  {
+                                                                                                                         "*/*":  {
+                                                                                                                                     "schema":  {
+                                                                                                                                                    "type":  "object",
+                                                                                                                                                    "additionalProperties":  {
+                                                                                                                                                                                 "type":  "object"
+                                                                                                                                                                             }
+                                                                                                                                                }
+                                                                                                                                 }
+                                                                                                                     }
+                                                                                                     },
+                                                                                             "401":  {
+                                                                                                         "description":  "Missing or invalid JWT",
+                                                                                                         "content":  {
+                                                                                                                         "*/*":  {
+                                                                                                                                     "schema":  {
+                                                                                                                                                    "type":  "object",
+                                                                                                                                                    "additionalProperties":  {
+                                                                                                                                                                                 "type":  "object"
+                                                                                                                                                                             }
+                                                                                                                                                }
+                                                                                                                                 }
+                                                                                                                     }
+                                                                                                     }
+                                                                                         },
+                                                                           "security":  [
+                                                                                            {
+                                                                                                "bearerAuth":  [
+
+                                                                                                               ]
+                                                                                            }
+                                                                                        ]
+                                                                       }
+                                                           },
+                  "/api/drivers/location":  {
+                                                "post":  {
+                                                             "tags":  [
+                                                                          "Drivers"
+                                                                      ],
+                                                             "summary":  "Publish driver GPS ping",
+                                                             "description":  "Receives telemetry coordinates from a driver and writes them to Cassandra.",
+                                                             "operationId":  "receiveLocation",
+                                                             "parameters":  [
+                                                                                {
+                                                                                    "name":  "X-User-Id",
+                                                                                    "in":  "header",
+                                                                                    "required":  false,
+                                                                                    "schema":  {
+                                                                                                   "type":  "string"
+                                                                                               }
+                                                                                }
+                                                                            ],
+                                                             "requestBody":  {
+                                                                                 "content":  {
+                                                                                                 "application/json":  {
+                                                                                                                          "schema":  {
+                                                                                                                                         "$ref":  "#/components/schemas/GpsPingRequest"
+                                                                                                                                     }
+                                                                                                                      }
+                                                                                             },
+                                                                                 "required":  true
+                                                                             },
+                                                             "responses":  {
+                                                                               "403":  {
+                                                                                           "description":  "Insufficient role (requires DRIVER)",
+                                                                                           "content":  {
+                                                                                                           "*/*":  {
+                                                                                                                       "schema":  {
+                                                                                                                                      "type":  "object",
+                                                                                                                                      "additionalProperties":  {
+                                                                                                                                                                   "type":  "object"
+                                                                                                                                                               }
+                                                                                                                                  }
+                                                                                                                   }
+                                                                                                       }
+                                                                                       },
+                                                                               "401":  {
+                                                                                           "description":  "Missing or invalid JWT",
+                                                                                           "content":  {
+                                                                                                           "*/*":  {
+                                                                                                                       "schema":  {
+                                                                                                                                      "type":  "object",
+                                                                                                                                      "additionalProperties":  {
+                                                                                                                                                                   "type":  "object"
+                                                                                                                                                               }
+                                                                                                                                  }
+                                                                                                                   }
+                                                                                                       }
+                                                                                       },
+                                                                               "200":  {
+                                                                                           "description":  "Position recorded",
+                                                                                           "content":  {
+                                                                                                           "*/*":  {
+                                                                                                                       "schema":  {
+                                                                                                                                      "type":  "object",
+                                                                                                                                      "additionalProperties":  {
+                                                                                                                                                                   "type":  "object"
+                                                                                                                                                               }
+                                                                                                                                  }
+                                                                                                                   }
+                                                                                                       }
+                                                                                       }
+                                                                           },
+                                                             "security":  [
+                                                                              {
+                                                                                  "bearerAuth":  [
+
+                                                                                                 ]
+                                                                              }
+                                                                          ]
+                                                         }
+                                            },
+                  "/api/drivers/trips/history":  {
+                                                     "get":  {
+                                                                 "tags":  [
+                                                                              "Drivers"
+                                                                          ],
+                                                                 "summary":  "Get driver trip history from Cassandra",
+                                                                 "description":  "Retrieves past trips for the authenticated driver.",
+                                                                 "operationId":  "myTrips",
+                                                                 "parameters":  [
+                                                                                    {
+                                                                                        "name":  "X-User-Id",
+                                                                                        "in":  "header",
+                                                                                        "required":  false,
+                                                                                        "schema":  {
+                                                                                                       "type":  "string"
+                                                                                                   }
+                                                                                    },
+                                                                                    {
+                                                                                        "name":  "X-User-Role",
+                                                                                        "in":  "header",
+                                                                                        "required":  false,
+                                                                                        "schema":  {
+                                                                                                       "type":  "string"
+                                                                                                   }
+                                                                                    },
+                                                                                    {
+                                                                                        "name":  "driverId",
+                                                                                        "in":  "query",
+                                                                                        "required":  false,
+                                                                                        "schema":  {
+                                                                                                       "type":  "string"
+                                                                                                   }
+                                                                                    },
+                                                                                    {
+                                                                                        "name":  "limit",
+                                                                                        "in":  "query",
+                                                                                        "required":  false,
+                                                                                        "schema":  {
+                                                                                                       "type":  "integer",
+                                                                                                       "format":  "int32",
+                                                                                                       "default":  20
+                                                                                                   }
+                                                                                    }
+                                                                                ],
+                                                                 "responses":  {
+                                                                                   "403":  {
+                                                                                               "description":  "Insufficient role or accessing another driver\u0027s data",
+                                                                                               "content":  {
+                                                                                                               "*/*":  {
+                                                                                                                           "schema":  {
+                                                                                                                                          "type":  "object"
+                                                                                                                                      }
+                                                                                                                       }
+                                                                                                           }
+                                                                                           },
+                                                                                   "401":  {
+                                                                                               "description":  "Missing or invalid JWT",
+                                                                                               "content":  {
+                                                                                                               "*/*":  {
+                                                                                                                           "schema":  {
+                                                                                                                                          "type":  "object"
+                                                                                                                                      }
+                                                                                                                       }
+                                                                                                           }
+                                                                                           },
+                                                                                   "200":  {
+                                                                                               "description":  "Trip history returned",
+                                                                                               "content":  {
+                                                                                                               "*/*":  {
+                                                                                                                           "schema":  {
+                                                                                                                                          "type":  "object"
+                                                                                                                                      }
+                                                                                                                       }
+                                                                                                           }
+                                                                                           }
+                                                                               },
+                                                                 "security":  [
+                                                                                  {
+                                                                                      "bearerAuth":  [
+
+                                                                                                     ]
+                                                                                  }
+                                                                              ]
+                                                             }
+                                                 },
+                  "/api/admin/drivers":  {
+                                             "get":  {
+                                                         "tags":  [
+                                                                      "Admin Drivers"
+                                                                  ],
+                                                         "summary":  "List all drivers with status filtering and pagination",
+                                                         "operationId":  "listAll",
+                                                         "parameters":  [
+                                                                            {
+                                                                                "name":  "status",
+                                                                                "in":  "query",
+                                                                                "required":  false,
+                                                                                "schema":  {
+                                                                                               "type":  "string"
+                                                                                           }
+                                                                            },
+                                                                            {
+                                                                                "name":  "page",
+                                                                                "in":  "query",
+                                                                                "required":  false,
+                                                                                "schema":  {
+                                                                                               "type":  "integer",
+                                                                                               "format":  "int32",
+                                                                                               "default":  0
+                                                                                           }
+                                                                            },
+                                                                            {
+                                                                                "name":  "size",
+                                                                                "in":  "query",
+                                                                                "required":  false,
+                                                                                "schema":  {
+                                                                                               "type":  "integer",
+                                                                                               "format":  "int32",
+                                                                                               "default":  50
+                                                                                           }
+                                                                            }
+                                                                        ],
+                                                         "responses":  {
+                                                                           "200":  {
+                                                                                       "description":  "OK",
+                                                                                       "content":  {
+                                                                                                       "*/*":  {
+                                                                                                                   "schema":  {
+                                                                                                                                  "type":  "object"
+                                                                                                                              }
+                                                                                                               }
+                                                                                                   }
+                                                                                   }
+                                                                       }
+                                                     }
+                                         },
+                  "/api/admin/drivers/{driverId}":  {
+                                                        "get":  {
+                                                                    "tags":  [
+                                                                                 "Admin Drivers"
+                                                                             ],
+                                                                    "summary":  "Get detailed driver profile with recent trips",
+                                                                    "operationId":  "getDriverDetail",
+                                                                    "parameters":  [
+                                                                                       {
+                                                                                           "name":  "driverId",
+                                                                                           "in":  "path",
+                                                                                           "required":  true,
+                                                                                           "schema":  {
+                                                                                                          "type":  "string"
+                                                                                                      }
+                                                                                       }
+                                                                                   ],
+                                                                    "responses":  {
+                                                                                      "200":  {
+                                                                                                  "description":  "OK",
+                                                                                                  "content":  {
+                                                                                                                  "*/*":  {
+                                                                                                                              "schema":  {
+                                                                                                                                             "type":  "object"
+                                                                                                                                         }
+                                                                                                                          }
+                                                                                                              }
+                                                                                              }
+                                                                                  }
+                                                                }
+                                                    },
+                  "/api/admin/drivers/live-positions":  {
+                                                            "get":  {
+                                                                        "tags":  [
+                                                                                     "Admin Drivers"
+                                                                                 ],
+                                                                        "summary":  "Get live GPS positions of all active drivers",
+                                                                        "operationId":  "livePositions",
+                                                                        "responses":  {
+                                                                                          "200":  {
+                                                                                                      "description":  "OK",
+                                                                                                      "content":  {
+                                                                                                                      "*/*":  {
+                                                                                                                                  "schema":  {
+                                                                                                                                                 "type":  "object"
+                                                                                                                                             }
+                                                                                                                              }
+                                                                                                                  }
+                                                                                                  }
+                                                                                      }
+                                                                    }
+                                                        },
+                  "/api/billing/stripe/webhook":  {
+                                                      "post":  {
+                                                                   "tags":  [
+                                                                                "Stripe Webhook"
+                                                                            ],
+                                                                   "summary":  "Handle Stripe Webhook events",
+                                                                   "description":  "Receives signed payment events from Stripe",
+                                                                   "operationId":  "handleWebhook",
+                                                                   "parameters":  [
+                                                                                      {
+                                                                                          "name":  "Stripe-Signature",
+                                                                                          "in":  "header",
+                                                                                          "required":  false,
+                                                                                          "schema":  {
+                                                                                                         "type":  "string"
+                                                                                                     }
+                                                                                      }
+                                                                                  ],
+                                                                   "requestBody":  {
+                                                                                       "content":  {
+                                                                                                       "application/json":  {
+                                                                                                                                "schema":  {
+                                                                                                                                               "type":  "string"
+                                                                                                                                           }
+                                                                                                                            }
+                                                                                                   },
+                                                                                       "required":  true
+                                                                                   },
+                                                                   "responses":  {
+                                                                                     "200":  {
+                                                                                                 "description":  "OK",
+                                                                                                 "content":  {
+                                                                                                                 "*/*":  {
+                                                                                                                             "schema":  {
+                                                                                                                                            "type":  "string"
+                                                                                                                                        }
+                                                                                                                         }
+                                                                                                             }
+                                                                                             }
+                                                                                 }
+                                                               }
+                                                  },
+                  "/api/billing/trips/{tripId}":  {
+                                                      "get":  {
+                                                                  "tags":  [
+                                                                               "Billing"
+                                                                           ],
+                                                                  "summary":  "Get detailed fare breakdown by Trip ID",
+                                                                  "operationId":  "getBillingByTrip",
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "tripId",
+                                                                                         "in":  "path",
+                                                                                         "required":  true,
+                                                                                         "schema":  {
+                                                                                                        "type":  "string"
+                                                                                                    }
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "X-User-Id",
+                                                                                         "in":  "header",
+                                                                                         "required":  false,
+                                                                                         "schema":  {
+                                                                                                        "type":  "string"
+                                                                                                    }
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "X-User-Role",
+                                                                                         "in":  "header",
+                                                                                         "required":  false,
+                                                                                         "schema":  {
+                                                                                                        "type":  "string"
+                                                                                                    }
+                                                                                     }
+                                                                                 ],
+                                                                  "responses":  {
+                                                                                    "200":  {
+                                                                                                "description":  "OK",
+                                                                                                "content":  {
+                                                                                                                "*/*":  {
+                                                                                                                            "schema":  {
+                                                                                                                                           "type":  "object"
+                                                                                                                                       }
+                                                                                                                        }
+                                                                                                            }
+                                                                                            }
+                                                                                }
+                                                              }
+                                                  },
+                  "/api/billing/history":  {
+                                               "get":  {
+                                                           "tags":  [
+                                                                        "Billing"
+                                                                    ],
+                                                           "summary":  "Get paginated billing history for authenticated client",
+                                                           "operationId":  "myBillingHistory",
+                                                           "parameters":  [
+                                                                              {
+                                                                                  "name":  "X-User-Id",
+                                                                                  "in":  "header",
+                                                                                  "required":  true,
+                                                                                  "schema":  {
+                                                                                                 "type":  "string"
+                                                                                             }
+                                                                              },
+                                                                              {
+                                                                                  "name":  "page",
+                                                                                  "in":  "query",
+                                                                                  "required":  false,
+                                                                                  "schema":  {
+                                                                                                 "type":  "integer",
+                                                                                                 "format":  "int32",
+                                                                                                 "default":  0
+                                                                                             }
+                                                                              },
+                                                                              {
+                                                                                  "name":  "size",
+                                                                                  "in":  "query",
+                                                                                  "required":  false,
+                                                                                  "schema":  {
+                                                                                                 "type":  "integer",
+                                                                                                 "format":  "int32",
+                                                                                                 "default":  20
+                                                                                             }
+                                                                              }
+                                                                          ],
+                                                           "responses":  {
+                                                                             "200":  {
+                                                                                         "description":  "OK",
+                                                                                         "content":  {
+                                                                                                         "*/*":  {
+                                                                                                                     "schema":  {
+                                                                                                                                    "type":  "object"
+                                                                                                                                }
+                                                                                                                 }
+                                                                                                     }
+                                                                                     }
+                                                                         }
+                                                       }
+                                           },
+                  "/api/billing/drivers/{driverId}":  {
+                                                          "get":  {
+                                                                      "tags":  [
+                                                                                   "Billing"
+                                                                               ],
+                                                                      "summary":  "Get billing history for a Driver",
+                                                                      "operationId":  "getDriverBilling",
+                                                                      "parameters":  [
+                                                                                         {
+                                                                                             "name":  "driverId",
+                                                                                             "in":  "path",
+                                                                                             "required":  true,
+                                                                                             "schema":  {
+                                                                                                            "type":  "string"
+                                                                                                        }
+                                                                                         }
+                                                                                     ],
+                                                                      "responses":  {
+                                                                                        "200":  {
+                                                                                                    "description":  "OK",
+                                                                                                    "content":  {
+                                                                                                                    "*/*":  {
+                                                                                                                                "schema":  {
+                                                                                                                                               "type":  "array",
+                                                                                                                                               "items":  {
+                                                                                                                                                             "$ref":  "#/components/schemas/BillingRecord"
+                                                                                                                                                         }
+                                                                                                                                           }
+                                                                                                                            }
+                                                                                                                }
+                                                                                                }
+                                                                                    }
+                                                                  }
+                                                      },
+                  "/api/drivers/earnings/trips":  {
+                                                      "get":  {
+                                                                  "tags":  [
+                                                                               "Driver Earnings"
+                                                                           ],
+                                                                  "summary":  "Get paginated list of driver trip earnings",
+                                                                  "operationId":  "tripEarnings",
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "X-User-Id",
+                                                                                         "in":  "header",
+                                                                                         "required":  false,
+                                                                                         "schema":  {
+                                                                                                        "type":  "string"
+                                                                                                    }
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "X-User-Role",
+                                                                                         "in":  "header",
+                                                                                         "required":  false,
+                                                                                         "schema":  {
+                                                                                                        "type":  "string"
+                                                                                                    }
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "driverId",
+                                                                                         "in":  "query",
+                                                                                         "required":  false,
+                                                                                         "schema":  {
+                                                                                                        "type":  "string"
+                                                                                                    }
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "page",
+                                                                                         "in":  "query",
+                                                                                         "required":  false,
+                                                                                         "schema":  {
+                                                                                                        "type":  "integer",
+                                                                                                        "format":  "int32",
+                                                                                                        "default":  0
+                                                                                                    }
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "size",
+                                                                                         "in":  "query",
+                                                                                         "required":  false,
+                                                                                         "schema":  {
+                                                                                                        "type":  "integer",
+                                                                                                        "format":  "int32",
+                                                                                                        "default":  20
+                                                                                                    }
+                                                                                     }
+                                                                                 ],
+                                                                  "responses":  {
+                                                                                    "200":  {
+                                                                                                "description":  "OK",
+                                                                                                "content":  {
+                                                                                                                "*/*":  {
+                                                                                                                            "schema":  {
+                                                                                                                                           "type":  "object"
+                                                                                                                                       }
+                                                                                                                        }
+                                                                                                            }
+                                                                                            }
+                                                                                }
+                                                              }
+                                                  },
+                  "/api/billing/drivers/earnings/trips":  {
+                                                              "get":  {
+                                                                          "tags":  [
+                                                                                       "Driver Earnings"
+                                                                                   ],
+                                                                          "summary":  "Get paginated list of driver trip earnings",
+                                                                          "operationId":  "tripEarnings_1",
+                                                                          "parameters":  [
+                                                                                             {
+                                                                                                 "name":  "X-User-Id",
+                                                                                                 "in":  "header",
+                                                                                                 "required":  false,
+                                                                                                 "schema":  {
+                                                                                                                "type":  "string"
+                                                                                                            }
+                                                                                             },
+                                                                                             {
+                                                                                                 "name":  "X-User-Role",
+                                                                                                 "in":  "header",
+                                                                                                 "required":  false,
+                                                                                                 "schema":  {
+                                                                                                                "type":  "string"
+                                                                                                            }
+                                                                                             },
+                                                                                             {
+                                                                                                 "name":  "driverId",
+                                                                                                 "in":  "query",
+                                                                                                 "required":  false,
+                                                                                                 "schema":  {
+                                                                                                                "type":  "string"
+                                                                                                            }
+                                                                                             },
+                                                                                             {
+                                                                                                 "name":  "page",
+                                                                                                 "in":  "query",
+                                                                                                 "required":  false,
+                                                                                                 "schema":  {
+                                                                                                                "type":  "integer",
+                                                                                                                "format":  "int32",
+                                                                                                                "default":  0
+                                                                                                            }
+                                                                                             },
+                                                                                             {
+                                                                                                 "name":  "size",
+                                                                                                 "in":  "query",
+                                                                                                 "required":  false,
+                                                                                                 "schema":  {
+                                                                                                                "type":  "integer",
+                                                                                                                "format":  "int32",
+                                                                                                                "default":  20
+                                                                                                            }
+                                                                                             }
+                                                                                         ],
+                                                                          "responses":  {
+                                                                                            "200":  {
+                                                                                                        "description":  "OK",
+                                                                                                        "content":  {
+                                                                                                                        "*/*":  {
+                                                                                                                                    "schema":  {
+                                                                                                                                                   "type":  "object"
+                                                                                                                                               }
+                                                                                                                                }
+                                                                                                                    }
+                                                                                                    }
+                                                                                        }
+                                                                      }
+                                                          },
+                  "/api/drivers/earnings/summary":  {
+                                                        "get":  {
+                                                                    "tags":  [
+                                                                                 "Driver Earnings"
+                                                                             ],
+                                                                    "summary":  "Get driver earnings summary (today, this week, this month)",
+                                                                    "operationId":  "summary",
+                                                                    "parameters":  [
+                                                                                       {
+                                                                                           "name":  "X-User-Id",
+                                                                                           "in":  "header",
+                                                                                           "required":  false,
+                                                                                           "schema":  {
+                                                                                                          "type":  "string"
+                                                                                                      }
+                                                                                       },
+                                                                                       {
+                                                                                           "name":  "X-User-Role",
+                                                                                           "in":  "header",
+                                                                                           "required":  false,
+                                                                                           "schema":  {
+                                                                                                          "type":  "string"
+                                                                                                      }
+                                                                                       },
+                                                                                       {
+                                                                                           "name":  "driverId",
+                                                                                           "in":  "query",
+                                                                                           "required":  false,
+                                                                                           "schema":  {
+                                                                                                          "type":  "string"
+                                                                                                      }
+                                                                                       }
+                                                                                   ],
+                                                                    "responses":  {
+                                                                                      "200":  {
+                                                                                                  "description":  "OK",
+                                                                                                  "content":  {
+                                                                                                                  "*/*":  {
+                                                                                                                              "schema":  {
+                                                                                                                                             "type":  "object"
+                                                                                                                                         }
+                                                                                                                          }
+                                                                                                              }
+                                                                                              }
+                                                                                  }
+                                                                }
+                                                    },
+                  "/api/billing/drivers/earnings/summary":  {
+                                                                "get":  {
+                                                                            "tags":  [
+                                                                                         "Driver Earnings"
+                                                                                     ],
+                                                                            "summary":  "Get driver earnings summary (today, this week, this month)",
+                                                                            "operationId":  "summary_1",
+                                                                            "parameters":  [
+                                                                                               {
+                                                                                                   "name":  "X-User-Id",
+                                                                                                   "in":  "header",
+                                                                                                   "required":  false,
+                                                                                                   "schema":  {
+                                                                                                                  "type":  "string"
+                                                                                                              }
+                                                                                               },
+                                                                                               {
+                                                                                                   "name":  "X-User-Role",
+                                                                                                   "in":  "header",
+                                                                                                   "required":  false,
+                                                                                                   "schema":  {
+                                                                                                                  "type":  "string"
+                                                                                                              }
+                                                                                               },
+                                                                                               {
+                                                                                                   "name":  "driverId",
+                                                                                                   "in":  "query",
+                                                                                                   "required":  false,
+                                                                                                   "schema":  {
+                                                                                                                  "type":  "string"
+                                                                                                              }
+                                                                                               }
+                                                                                           ],
+                                                                            "responses":  {
+                                                                                              "200":  {
+                                                                                                          "description":  "OK",
+                                                                                                          "content":  {
+                                                                                                                          "*/*":  {
+                                                                                                                                      "schema":  {
+                                                                                                                                                     "type":  "object"
+                                                                                                                                                 }
+                                                                                                                                  }
+                                                                                                                      }
+                                                                                                      }
+                                                                                          }
+                                                                        }
+                                                            },
+                  "/api/billing/clients/{clientId}":  {
+                                                          "get":  {
+                                                                      "tags":  [
+                                                                                   "Billing"
+                                                                               ],
+                                                                      "summary":  "Get billing history for a Client",
+                                                                      "operationId":  "getClientBilling",
+                                                                      "parameters":  [
+                                                                                         {
+                                                                                             "name":  "clientId",
+                                                                                             "in":  "path",
+                                                                                             "required":  true,
+                                                                                             "schema":  {
+                                                                                                            "type":  "string"
+                                                                                                        }
+                                                                                         }
+                                                                                     ],
+                                                                      "responses":  {
+                                                                                        "200":  {
+                                                                                                    "description":  "OK",
+                                                                                                    "content":  {
+                                                                                                                    "*/*":  {
+                                                                                                                                "schema":  {
+                                                                                                                                               "type":  "array",
+                                                                                                                                               "items":  {
+                                                                                                                                                             "$ref":  "#/components/schemas/BillingRecord"
+                                                                                                                                                         }
+                                                                                                                                           }
+                                                                                                                            }
+                                                                                                                }
+                                                                                                }
+                                                                                    }
+                                                                  }
+                                                      },
+                  "/api/admin/billing/top-drivers":  {
+                                                         "get":  {
+                                                                     "tags":  [
+                                                                                  "Admin Billing"
+                                                                              ],
+                                                                     "summary":  "Get top drivers by payout leaderboard",
+                                                                     "operationId":  "topDrivers",
+                                                                     "parameters":  [
+                                                                                        {
+                                                                                            "name":  "limit",
+                                                                                            "in":  "query",
+                                                                                            "required":  false,
+                                                                                            "schema":  {
+                                                                                                           "type":  "integer",
+                                                                                                           "format":  "int32",
+                                                                                                           "default":  10
+                                                                                                       }
+                                                                                        },
+                                                                                        {
+                                                                                            "name":  "date",
+                                                                                            "in":  "query",
+                                                                                            "required":  false,
+                                                                                            "schema":  {
+                                                                                                           "type":  "string"
+                                                                                                       }
+                                                                                        }
+                                                                                    ],
+                                                                     "responses":  {
+                                                                                       "200":  {
+                                                                                                   "description":  "OK",
+                                                                                                   "content":  {
+                                                                                                                   "*/*":  {
+                                                                                                                               "schema":  {
+                                                                                                                                              "type":  "object"
+                                                                                                                                          }
+                                                                                                                           }
+                                                                                                               }
+                                                                                               }
+                                                                                   }
+                                                                 }
+                                                     },
+                  "/api/admin/billing/summary":  {
+                                                     "get":  {
+                                                                 "tags":  [
+                                                                              "Admin Billing"
+                                                                          ],
+                                                                 "summary":  "Get daily revenue, commission, and payout summary",
+                                                                 "operationId":  "summary_2",
+                                                                 "parameters":  [
+                                                                                    {
+                                                                                        "name":  "date",
+                                                                                        "in":  "query",
+                                                                                        "required":  false,
+                                                                                        "schema":  {
+                                                                                                       "type":  "string"
+                                                                                                   }
+                                                                                    }
+                                                                                ],
+                                                                 "responses":  {
+                                                                                   "200":  {
+                                                                                               "description":  "OK",
+                                                                                               "content":  {
+                                                                                                               "*/*":  {
+                                                                                                                           "schema":  {
+                                                                                                                                          "type":  "object"
+                                                                                                                                      }
+                                                                                                                       }
+                                                                                                           }
+                                                                                           }
+                                                                               }
+                                                             }
+                                                 }
+              },
+    "components":  {
+                       "schemas":  {
+                                       "RegisterRequest":  {
+                                                               "required":  [
+                                                                                "email",
+                                                                                "password"
+                                                                            ],
+                                                               "type":  "object",
+                                                               "properties":  {
+                                                                                  "email":  {
+                                                                                                "type":  "string",
+                                                                                                "description":  "User email address",
+                                                                                                "example":  "soufiane@test.com"
+                                                                                            },
+                                                                                  "password":  {
+                                                                                                   "type":  "string",
+                                                                                                   "description":  "Account password (plain text, will be hashed with BCrypt)",
+                                                                                                   "example":  "secret123"
+                                                                                               },
+                                                                                  "fullName":  {
+                                                                                                   "type":  "string",
+                                                                                                   "description":  "Full name of the user",
+                                                                                                   "example":  "Soufiane B"
+                                                                                               },
+                                                                                  "phone":  {
+                                                                                                "type":  "string",
+                                                                                                "description":  "Contact phone number",
+                                                                                                "example":  "+212600000000"
+                                                                                            },
+                                                                                  "role":  {
+                                                                                               "type":  "string",
+                                                                                               "description":  "User role in the platform",
+                                                                                               "example":  "DRIVER",
+                                                                                               "enum":  [
+                                                                                                            "CLIENT",
+                                                                                                            "DRIVER",
+                                                                                                            "ADMIN"
+                                                                                                        ]
+                                                                                           }
+                                                                              },
+                                                               "description":  "User registration payload"
+                                                           },
+                                       "LoginRequest":  {
+                                                            "required":  [
+                                                                             "email",
+                                                                             "password"
+                                                                         ],
+                                                            "type":  "object",
+                                                            "properties":  {
+                                                                               "email":  {
+                                                                                             "type":  "string",
+                                                                                             "description":  "Registered email address",
+                                                                                             "example":  "soufiane@test.com"
+                                                                                         },
+                                                                               "password":  {
+                                                                                                "type":  "string",
+                                                                                                "description":  "Account password",
+                                                                                                "example":  "secret123"
+                                                                                            }
+                                                                           },
+                                                            "description":  "User login credentials payload"
+                                                        },
+                                       "TripRequestDto":  {
+                                                              "required":  [
+                                                                               "riderId"
+                                                                           ],
+                                                              "type":  "object",
+                                                              "properties":  {
+                                                                                 "riderId":  {
+                                                                                                 "type":  "string",
+                                                                                                 "description":  "Rider user identifier",
+                                                                                                 "example":  "rider_1234"
+                                                                                             },
+                                                                                 "originZone":  {
+                                                                                                    "maximum":  16,
+                                                                                                    "minimum":  1,
+                                                                                                    "type":  "integer",
+                                                                                                    "description":  "Pickup origin zone ID (1 to 16)",
+                                                                                                    "format":  "int32",
+                                                                                                    "example":  5
+                                                                                                },
+                                                                                 "destinationZone":  {
+                                                                                                         "maximum":  16,
+                                                                                                         "minimum":  1,
+                                                                                                         "type":  "integer",
+                                                                                                         "description":  "Dropoff destination zone ID (1 to 16)",
+                                                                                                         "format":  "int32",
+                                                                                                         "example":  12
+                                                                                                     },
+                                                                                 "originLat":  {
+                                                                                                   "type":  "number",
+                                                                                                   "description":  "Exact pickup latitude",
+                                                                                                   "format":  "double",
+                                                                                                   "example":  33.5731
+                                                                                               },
+                                                                                 "originLon":  {
+                                                                                                   "type":  "number",
+                                                                                                   "description":  "Exact pickup longitude",
+                                                                                                   "format":  "double",
+                                                                                                   "example":  -7.5898
+                                                                                               },
+                                                                                 "destinationLat":  {
+                                                                                                        "type":  "number",
+                                                                                                        "description":  "Exact dropoff latitude",
+                                                                                                        "format":  "double",
+                                                                                                        "example":  33.59
+                                                                                                    },
+                                                                                 "destinationLon":  {
+                                                                                                        "type":  "number",
+                                                                                                        "description":  "Exact dropoff longitude",
+                                                                                                        "format":  "double",
+                                                                                                        "example":  -7.61
+                                                                                                    }
+                                                                             },
+                                                              "description":  "Trip booking request payload with optional exact GPS coordinates and zone fallback"
+                                                          },
+                                       "GpsPingRequest":  {
+                                                              "required":  [
+                                                                               "driverId",
+                                                                               "lat",
+                                                                               "lon"
+                                                                           ],
+                                                              "type":  "object",
+                                                              "properties":  {
+                                                                                 "driverId":  {
+                                                                                                  "type":  "string",
+                                                                                                  "description":  "Driver taxi vehicle identifier",
+                                                                                                  "example":  "taxi_001"
+                                                                                              },
+                                                                                 "lat":  {
+                                                                                             "type":  "number",
+                                                                                             "description":  "GPS Latitude coordinate",
+                                                                                             "format":  "double",
+                                                                                             "example":  33.5731
+                                                                                         },
+                                                                                 "lon":  {
+                                                                                             "type":  "number",
+                                                                                             "description":  "GPS Longitude coordinate",
+                                                                                             "format":  "double",
+                                                                                             "example":  -7.5898
+                                                                                         },
+                                                                                 "speed":  {
+                                                                                               "type":  "number",
+                                                                                               "description":  "Vehicle speed in km/h",
+                                                                                               "format":  "double",
+                                                                                               "example":  35.0
+                                                                                           }
+                                                                             },
+                                                              "description":  "Driver telemetry GPS ping payload"
+                                                          },
+                                       "BillingRecord":  {
+                                                             "type":  "object",
+                                                             "properties":  {
+                                                                                "id":  {
+                                                                                           "type":  "string",
+                                                                                           "format":  "uuid"
+                                                                                       },
+                                                                                "tripId":  {
+                                                                                               "type":  "string"
+                                                                                           },
+                                                                                "driverId":  {
+                                                                                                 "type":  "string"
+                                                                                             },
+                                                                                "clientId":  {
+                                                                                                 "type":  "string"
+                                                                                             },
+                                                                                "distanceKm":  {
+                                                                                                   "type":  "number"
+                                                                                               },
+                                                                                "durationMin":  {
+                                                                                                    "type":  "number"
+                                                                                                },
+                                                                                "surgeMultiplier":  {
+                                                                                                        "type":  "number"
+                                                                                                    },
+                                                                                "baseFare":  {
+                                                                                                 "type":  "number"
+                                                                                             },
+                                                                                "distanceFare":  {
+                                                                                                     "type":  "number"
+                                                                                                 },
+                                                                                "timeFare":  {
+                                                                                                 "type":  "number"
+                                                                                             },
+                                                                                "totalFare":  {
+                                                                                                  "type":  "number"
+                                                                                              },
+                                                                                "commission":  {
+                                                                                                   "type":  "number"
+                                                                                               },
+                                                                                "driverPayout":  {
+                                                                                                     "type":  "number"
+                                                                                                 },
+                                                                                "currency":  {
+                                                                                                 "type":  "string"
+                                                                                             },
+                                                                                "status":  {
+                                                                                               "type":  "string"
+                                                                                           },
+                                                                                "stripePaymentId":  {
+                                                                                                        "type":  "string"
+                                                                                                    },
+                                                                                "createdAt":  {
+                                                                                                  "type":  "string",
+                                                                                                  "format":  "date-time"
+                                                                                              },
+                                                                                "chargedAt":  {
+                                                                                                  "type":  "string",
+                                                                                                  "format":  "date-time"
+                                                                                              },
+                                                                                "chargeAttempts":  {
+                                                                                                       "type":  "integer",
+                                                                                                       "format":  "int32"
+                                                                                                   },
+                                                                                "lastChargeError":  {
+                                                                                                        "type":  "string"
+                                                                                                    },
+                                                                                "lastAttemptedAt":  {
+                                                                                                        "type":  "string",
+                                                                                                        "format":  "date-time"
+                                                                                                    }
+                                                                            }
+                                                         }
+                                   },
+                       "securitySchemes":  {
+                                               "bearerAuth":  {
+                                                                  "scheme":  "bearer",
+                                                                  "description":  "JWT Bearer token",
+                                                                  "type":  "http",
+                                                                  "bearerFormat":  "JWT"
+                                                              }
+                                           }
+                   }
+}

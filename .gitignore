@@ -48,7 +48,17 @@ backend/**/target/
 .env.local
 *.secret
 
-# Node
+# Node & Frontend build outputs and caches
 node_modules/
 **/node_modules/
+dist/
+**/dist/
+dist-ssr/
+*.local
+.env*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+**/.tsbuildinfo
 
