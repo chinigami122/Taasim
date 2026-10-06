@@ -60,6 +60,44 @@ export default function Navbar() {
           </div>
         </div>
 
+        {/* Navigation Tabs */}
+        {email && (
+          <nav style={{ display: 'flex', gap: '8px' }}>
+            <a
+              href="/map"
+              className="btn-secondary"
+              style={{
+                padding: '6px 14px',
+                fontSize: '0.85rem',
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderColor: window.location.pathname === '/map' ? 'var(--primary-color, #6366f1)' : undefined
+              }}
+            >
+              <span>🗺️</span>
+              <span>Live Map Dispatch</span>
+            </a>
+            <a
+              href="/request-ride"
+              className="btn-secondary"
+              style={{
+                padding: '6px 14px',
+                fontSize: '0.85rem',
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderColor: window.location.pathname === '/request-ride' ? 'var(--primary-color, #6366f1)' : undefined
+              }}
+            >
+              <span>📋</span>
+              <span>Classic View</span>
+            </a>
+          </nav>
+        )}
+
         {/* User Info & Actions */}
         {email && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>

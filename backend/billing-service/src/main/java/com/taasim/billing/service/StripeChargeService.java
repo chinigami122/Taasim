@@ -84,4 +84,51 @@ public class StripeChargeService {
         log.info("💳 Stripe charge OK: {} for trip {} (amount={} {})", intent.getId(), tripId, amountMinorUnits, currency);
         return intent.getId();
     }
+
+    /**
+     * Create an unconfirmed PaymentIntent returning client_secret for Stripe Elements on the frontend.
+     */
+    public java.util.Map<String, Object> createPaymentIntent(long amountMinorUnits,
+                                                             String currency,
+                                                             String tripId,
+                                                             String description) throws StripeException {
+        if (!isConfigured()) {
+            log.info("🧪 Stripe not configured with real key — returning mock PaymentIntent client_secret for trip {}", tripId);
+            return java.util.Map.of(
+                    "clientSecret", "pi_mock_" + tripId + "_secret_mock",
+                    "paymentIntentId", "pi_mock_" + tripId,
+                    "amount", amountMinorUnits,
+                    "status", "requires_payment_method"
+            );
+        }
+
+        if (Stripe.apiKey == null || Stripe.apiKey.contains("placeholder")) {
+            Stripe.apiKey = secretKey;
+        }
+
+        PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
+                .setAmount(amountMinorUnits)
+                .setCurrency((currency != null ? currency : this.currency).toLowerCase())
+                .setDescription(description)
+                .putMetadata("trip_id", tripId)
+                .setAutomaticPaymentMethods(
+                        PaymentIntentCreateParams.AutomaticPaymentMethods.builder()
+                                .setEnabled(true)
+                                .build())
+                .build();
+
+        RequestOptions options = RequestOptions.builder()
+                .setIdempotencyKey("intent-trip-" + tripId)
+                .build();
+
+        PaymentIntent intent = PaymentIntent.create(params, options);
+        log.info("💳 Stripe PaymentIntent created: {} (client_secret ready) for trip {}", intent.getId(), tripId);
+
+        return java.util.Map.of(
+                "clientSecret", intent.getClientSecret() != null ? intent.getClientSecret() : "",
+                "paymentIntentId", intent.getId(),
+                "amount", intent.getAmount(),
+                "status", intent.getStatus()
+        );
+    }
 }

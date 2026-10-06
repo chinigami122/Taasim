@@ -21,9 +21,62 @@ import java.util.Map;
 public class BillingController {
 
     private final BillingRecordRepository repository;
+    private final com.taasim.billing.service.StripeChargeService stripeChargeService;
 
-    public BillingController(BillingRecordRepository repository) {
+    public BillingController(BillingRecordRepository repository,
+                             com.taasim.billing.service.StripeChargeService stripeChargeService) {
         this.repository = repository;
+        this.stripeChargeService = stripeChargeService;
+    }
+
+    @Operation(summary = "Create Stripe PaymentIntent client secret for trip payment on frontend")
+    @PostMapping("/trips/{tripId}/intent")
+    @PreAuthorize("hasAnyRole('CLIENT', 'ADMIN')")
+    public ResponseEntity<?> createTripPaymentIntent(
+            @PathVariable String tripId,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole) {
+
+        return repository.findByTripId(tripId)
+                .map(record -> {
+                    if (userRole != null && !"ADMIN".equalsIgnoreCase(userRole) && userId != null) {
+                        if (!userId.equals(record.getClientId())) {
+                            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                    .body(Map.of("error", "Not your trip"));
+                        }
+                    }
+
+                    long amountMinor = record.getTotalFare() != null
+                            ? record.getTotalFare().movePointRight(2).longValueExact()
+                            : 2500L;
+
+                    try {
+                        Map<String, Object> intent = stripeChargeService.createPaymentIntent(
+                                amountMinor,
+                                record.getCurrency() != null ? record.getCurrency() : "mad",
+                                tripId,
+                                "TaaSim trip fare " + tripId
+                        );
+                        return ResponseEntity.ok(intent);
+                    } catch (Exception e) {
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                .body(Map.of("error", "Stripe intent error: " + e.getMessage()));
+                    }
+                })
+                .orElseGet(() -> {
+                    try {
+                        Map<String, Object> intent = stripeChargeService.createPaymentIntent(
+                                2500L,
+                                "mad",
+                                tripId,
+                                "TaaSim estimated trip fare " + tripId
+                        );
+                        return ResponseEntity.ok(intent);
+                    } catch (Exception e) {
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                .body(Map.of("error", "Stripe intent error: " + e.getMessage()));
+                    }
+                });
     }
 
     @Operation(summary = "Get paginated billing history for authenticated client")

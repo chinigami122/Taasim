@@ -11,17 +11,25 @@
     "gen:api": "openapi --input ./openapi.json --output ./src/api --client fetch --useOptions"
   },
   "dependencies": {
+    "@stomp/stompjs": "^7.3.0",
+    "@stripe/react-stripe-js": "^7.0.0",
+    "@stripe/stripe-js": "^10.0.0",
     "@tanstack/react-query": "^5.104.1",
     "axios": "^1.20.0",
+    "leaflet": "^1.9.4",
     "lucide-react": "^1.50.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router-dom": "^7.18.4"
+    "react-leaflet": "^5.0.0",
+    "react-router-dom": "^7.18.4",
+    "sockjs-client": "^1.6.1"
   },
   "devDependencies": {
+    "@types/leaflet": "^1.9.22",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
+    "@types/sockjs-client": "^1.5.4",
     "@vitejs/plugin-react": "^6.1.1",
     "openapi-typescript-codegen": "^0.31.0",
     "oxlint": "^1.81.0",
