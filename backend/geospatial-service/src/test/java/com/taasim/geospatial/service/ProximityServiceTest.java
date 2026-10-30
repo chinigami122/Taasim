@@ -50,7 +50,8 @@ class ProximityServiceTest {
     void reservationExcludesConcurrentTripsAndAllowsReplay() {
         org.springframework.data.redis.core.ValueOperations<String, String> values = mock(org.springframework.data.redis.core.ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(values);
-        when(values.setIfAbsent(eq("driver:reservation:driver"), eq("trip-2"), any(java.time.Duration.class))).thenReturn(false);
+        when(values.get("driver:status:driver")).thenReturn("AVAILABLE");
+        when(values.setIfAbsent(eq("driver:reservation:driver"), anyString(), any(java.time.Duration.class))).thenReturn(false);
         when(values.get("driver:reservation:driver")).thenReturn("trip-1");
         assertThat(proximityService.reserve("driver", "trip-2")).isFalse();
         assertThat(proximityService.reserve("driver", "trip-1")).isTrue();
