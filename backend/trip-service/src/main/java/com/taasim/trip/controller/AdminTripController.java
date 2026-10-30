@@ -29,6 +29,17 @@ public class AdminTripController {
         return ResponseEntity.ok(tripService.adminListTrips(status, date, limit));
     }
 
+    @GetMapping("/funnel")
+    public java.util.Map<String, Long> funnel(@RequestParam(required = false) String date) {
+        var counts = new java.util.LinkedHashMap<String, Long>();
+        for (String status : java.util.List.of("REQUESTED", "MATCHED", "ACCEPTED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "REJECTED")) counts.put(status.toLowerCase(), 0L);
+        for (var trip : tripService.adminListTrips(null, date, 10000)) {
+            String status = trip.getOrDefault("status", "REQUESTED").toString().toLowerCase();
+            counts.computeIfPresent(status, (key, value) -> value + 1);
+        }
+        return counts;
+    }
+
     @Operation(summary = "Get trip operational KPIs and breakdown for a given date")
     @GetMapping("/stats")
     public ResponseEntity<?> stats(@RequestParam(required = false) String date) {

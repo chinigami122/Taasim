@@ -1,131 +1,105 @@
-# TaaSim Casablanca — Guide de Test et Déploiement (Évaluation)
+# TaaSim Casablanca
 
-[![backend-ci](https://github.com/chinigami122/Taasim/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/chinigami122/Taasim/actions/workflows/backend-ci.yml)
+A ride-hailing platform with a Kafka event backbone and a separate Flink/Spark analytics pipeline.
 
-Ce projet implémente une plateforme complète de traitement de données géospatiales et temporelles en temps réel (Streaming) et par lots (Batch) pour la gestion du trafic des taxis de Casablanca (TaaSim).
+```mermaid
+flowchart LR
+  Client[Client · 5173] --> Gateway[Gateway · 8080]
+  Driver[Driver · 5174] --> Gateway
+  Admin[Operations · 5175] --> Gateway
+  Gateway --> Auth[Authentication]
+  Gateway --> Trips[Trips]
+  Gateway --> Drivers[Drivers + STOMP]
+  Gateway --> Billing[Billing + Stripe]
+  Trips --> Kafka
+  Drivers --> Kafka
+  Kafka --> Matching
+  Matching --> Geo[Geospatial · Redis]
+  Kafka --> Billing
+  Kafka --> Analytics[Flink / MinIO / Spark / ML]
+```
 
-Le code source, les données (extraits dans `submission/donnees_extraits/`) et le rapport de synthèse (`submission/rapport/rapport.tex`) sont inclus dans ce livrable.
+## Run the three-app demo
 
----
+Requires Java 21, Maven, Node 22+, Docker Desktop's Linux engine and approximately 6 GB free Docker memory. From the repository root in PowerShell:
 
-## 🛠️ 1. Prérequis et Initialisation de l'Infrastructure
+```powershell
+./scripts/start_demo.ps1
+```
 
-Assurez-vous que Docker et Docker Compose sont installés sur votre machine de test.
+This packages the Java services, builds the frontends, starts `docker-compose.demo.yml`, waits for health and seeds accounts. The isolated demo does not start Flink, Spark or the old FastAPI server, avoiding their 8080/8081 port conflicts. Stop any other stack using the same gateway/UI ports first.
 
-1. **Lancer les services de l'infrastructure** (Kafka, Flink, Cassandra, MinIO, Spark, FastAPI, Grafana) :
-   ```bash
-   docker compose up -d
-   ```
-2. **Attendre environ 40 secondes** pour laisser les conteneurs s'initialiser et appliquer automatiquement le schéma Cassandra.
-3. **Vérifier l'état des conteneurs** :
-   ```bash
-   docker ps --format "table {{.Names}}\t{{.Status}}"
-   ```
+| App | Address | Demo login |
+| --- | --- | --- |
+| Passenger | http://localhost:5173 | client@taasim.demo |
+| Driver | http://localhost:5174 | driver1@taasim.demo |
+| Operations | http://localhost:5175 | admin@taasim.demo |
 
----
+Default demo password: `DemoPassword123!`. These are local demonstration accounts. `seed_demo.ps1 -Password ...` overrides it. Two additional driver accounts are driver2@taasim.demo and driver3@taasim.demo.
 
-## ⚡ 2. Lancement du Pipeline Temps Réel (Streaming PyFlink)
+### Three-tab walkthrough
 
-Les jobs PyFlink lisent les flux Kafka, agrègent la demande glissante par arrondissement de Casablanca, effectuent le matching de trajets, et écrivent les résultats dans Cassandra en temps réel.
+1. Open Operations and sign in. Keep Fleet selected.
+2. Open Driver. Select **Casablanca demo mode**, then **Go online**. This sends actual backend GPS requests from a desktop outside Casablanca. Browser GPS is available when driving locally.
+3. Open Passenger. Click a pickup near the driver's marker and a destination, then request the ride.
+4. In Driver, accept the offer and start the ride. Click positions along the map to move the demo taxi. Passenger sees GPS updates over STOMP; Operations sees the fleet position.
+5. Complete the ride. Passenger receives the calculated fare; Driver sees earnings; Operations shows the completed trip and fare totals.
+6. With Stripe test keys configured, use Stripe Elements to pay. Otherwise checkout explicitly remains unavailable: the app never pretends payment succeeded.
+7. Go offline before closing the driver tab. Closing the tab stops its GPS watch; availability currently requires explicit offline action.
 
-Exécutez les commandes suivantes pour lancer les 3 jobs Flink :
+The charts show **calculated plus charged fares**, not exclusively settled payments. Driver assignments and trip lookup caches currently depend on a single service instance and do not survive service restart. This is a demo milestone, not a production readiness claim.
 
-1. **Normalisateur de Positions GPS** :
-   ```bash
-   docker exec -it taasim-flink-jm flink run -d -py /opt/flink/usrlib/gps_job.py
-   ```
-2. **Agrégateur de Demande (fenêtre de 30s)** :
-   ```bash
-   docker exec -it taasim-flink-jm flink run -d -py /opt/flink/usrlib/demand_aggregator_job.py
-   ```
-3. **Moteur de Matching de Trajets** :
-   ```bash
-   docker exec -it taasim-flink-jm flink run -d -py /opt/flink/usrlib/trip_matcher_job.py
-   ```
+### Stripe test setup
 
-Vous pouvez suivre l'exécution de ces jobs sur le tableau de bord Flink : [http://localhost:8081](http://localhost:8081).
+Put `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `VITE_STRIPE_PK` in the repository's ignored `.env`. Rebuild the UI after changing the publishable key. Forward Stripe test events to `/api/billing/stripe/webhook`. Automatic charging defaults off: checkout creates one unconfirmed intent for a persisted billing record and uses a stable per-trip idempotency key. A signed success webhook updates the billing status.
 
----
+## Develop locally
 
-## 🚕 3. Lancement des Simulateurs (Producers Kafka)
+```powershell
+cd frontend
+npm ci
+npm run dev --workspace=client-app
+# In additional terminals from frontend/:
+npm run dev --workspace=driver-app
+npm run dev --workspace=admin-app
+```
 
-Les simulateurs génèrent des données synthétiques de positions de véhicules et de demandes de trajets clients à Casablanca.
+The frontend is one npm workspace with one authoritative lockfile at `frontend/package-lock.json`. Shared auth, HTTP, STOMP, map and styling code lives in `frontend/shared`. Do dependency installation from `frontend/`. `VITE_API_BASE` and `VITE_WS_BASE` override the gateway addresses in each app's `.env.local`.
 
-1. **Créer un environnement virtuel local et installer les dépendances** :
-   ```bash
-   python -m venv venv
-   # Sur Windows :
-   .\venv\Scripts\activate
-   # Installez les packages :
-   pip install kafka-python pandas pyarrow
-   ```
-2. **Lancer le producteur GPS (Terminal 1)** :
-   ```bash
-   python src/simulators/vehicle_gps_producer.py --broker localhost:9092 --speed 10
-   ```
-3. **Lancer le producteur de demandes de trajets (Terminal 2)** :
-   ```bash
-   python src/simulators/trip_request_producer.py --broker localhost:9092
-   ```
+## Validation
 
----
+```powershell
+mvn -B -f backend/pom.xml verify  # unit tests + Docker-backed integration tests
+cd frontend
+npm ci
+npm run lint
+npm run build
+cd ..
+node scripts/smoke_demo.mjs       # running isolated stack required
+# Full load scenario:
+docker run --rm --network host -v "${PWD}/tests/load:/scripts:ro" grafana/k6:1.3.0 run /scripts/full_flow.js
+```
 
-## 📊 4. Visualisation et Inférence ML
+`smoke_demo.mjs` registers isolated accounts and verifies dispatch, accept/start/complete, GPS, fare creation, earnings, admin reporting, role rejection and offline behavior. k6 separately measures request and status endpoints: 20 virtual users, request p95 <800 ms, status p95 <200 ms, HTTP failures <1%. It does not simulate payment or claim to load-test full dispatch. Results must be measured on the target environment; no performance numbers are fabricated.
 
-Une fois le flux actif, les données agrégées alimentent Cassandra et le tableau de bord Grafana en temps réel.
+GitHub Actions runs backend tests/container builds, all three frontend builds, and an isolated end-to-end/k6 smoke workflow. Logs are retained as workflow artifacts. The existing auth integration test now runs in Maven's `verify` phase through Failsafe.
 
-1. **Grafana Dashboard** :
-   * URL : [http://localhost:3000](http://localhost:3000) (Identifiants : `admin` / `admin`).
-   * Allez dans les Dashboards pour voir le tableau de bord provisionné **TaaSim Casablanca** qui affiche la répartition géographique de la demande, les temps d'attente (ETA) moyens et le statut de la flotte.
-2. **FastAPI (Inférence ML)** :
-   * URL de la documentation Swagger : [http://localhost:8000/docs](http://localhost:8000/docs).
-   * L'API charge automatiquement le modèle GBTRegressor pré-entraîné depuis MinIO et expose un endpoint `/api/predict` pour estimer la demande et l'ETA futures par arrondissement.
+## Deployment is deferred
 
----
+No deployment is performed by this change. `deploy-on-tag.yml` is guarded by `DEPLOY_ENABLED=true` and a production environment; it stays skipped by default. Before enabling it, configure SSH credentials, a verified SSH host key, `.env`, public frontend API/WebSocket build URLs, image availability, a domain and HTTPS. `deploy/deploy.sh` combines the demo infrastructure compose with the complete GHCR image overlay, without deleting data volumes.
 
-## 🗄️ 5. Exécution du Pipeline Batch (Apache Spark ML)
+## Analytics pipeline
 
-Le traitement batch traite l'archivage historique brut stocké sur MinIO pour calculer les KPIs analytiques globaux et réentraîner le modèle de Machine Learning.
+The existing `docker-compose.yml` launches Kafka, Cassandra, MinIO, Flink, Spark/Jupyter, Grafana, Prometheus, Tempo and Schema Registry. Launch it separately from the isolated demo until the overlapping ports are remapped. Source directories contain:
 
-1. **Préparer les données brutes dans le conteneur MinIO** :
-   ```bash
-   # Copier le dataset de trajets Porto (train.csv) et le mapping de Casablanca
-   docker cp data/train.csv taasim-minio:/tmp/train.csv
-   docker cp data/zone_mapping.csv taasim-minio:/tmp/zone_mapping.csv
+- `src/simulators`: Kafka GPS and trip generators.
+- `src/flink`: GPS normalization, demand aggregation and legacy matching.
+- `src/archiver`: Kafka-to-MinIO batches.
+- `src/spark`: Porto/Casablanca mapping, ETL, KPIs and GBT demand forecasting.
+- `src/api`: earlier FastAPI analytics serving layer.
 
-   # Charger les données brutes dans le bucket local S3 "raw"
-   docker exec taasim-minio mc cp /tmp/train.csv local/raw/porto-trips/train.csv
-   docker exec taasim-minio mc cp /tmp/zone_mapping.csv local/raw/zone-mapping/zone_mapping.csv
-   ```
-2. **Installer la bibliothèque H3 dans l'environnement Spark/Jupyter** :
-   ```bash
-   docker exec -it taasim-jupyter pip install h3
-   ```
-3. **Lancer le job ETL Spark (Nettoyage et structuration Curated)** :
-   ```bash
-   docker exec -it taasim-jupyter spark-submit \
-     --master "local[*]" --driver-memory 4G --executor-memory 4G \
-     --packages "org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262" \
-     /home/jovyan/src/spark/etl_porto.py
-   ```
-4. **Lancer le script de réentraînement du modèle de demande (Gradient Boosted Trees)** :
-   ```bash
-   docker exec -it taasim-jupyter spark-submit \
-     --master "local[*]" --driver-memory 4G --executor-memory 4G \
-     --packages "org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262" \
-     /home/jovyan/src/spark/ml_demand_forecasting_week6.py
-   ```
-   Le modèle entraîné sera directement sauvegardé dans le bucket MinIO `ml-store/models/gbt_hour_zone.model` pour être rechargé par FastAPI.
+Do not run the legacy Flink trip matcher alongside the Spring matching service against the same operational topics. Forecast-to-pricing integration remains a future feature.
 
----
+## Roadmap status
 
-## 🌐 6. Annuaires des Consoles et Services Web
-
-| Service / Interface | URL Locale | Identifiants / Notes |
-|:---|:---|:---|
-| **Grafana Dashboard** | [http://localhost:3000](http://localhost:3000) | `admin` / `admin` |
-| **MinIO Console** | [http://localhost:9001](http://localhost:9001) | `admin` / `password` |
-| **FastAPI Backend / Swagger Docs** | [http://localhost:8000/docs](http://localhost:8000/docs) | Endpoint `/api/zones/geojson`, `/api/predict` |
-| **Flink Dashboard** | [http://localhost:8081](http://localhost:8081) | Visualisation des graphes et latences PyFlink |
-| **Jupyter Lab** | [http://localhost:8888](http://localhost:8888) | Token d'accès : `taasim` |
-| **Spark Master UI** | [http://localhost:8080](http://localhost:8080) | Statut du cluster Spark |
+Slices 23 and 24 have driver/admin UI implementations and backend support. Slice 25 supplies the demo launcher, seeds, full-flow smoke, k6, CI and deferred deployment assets. A real Stripe card walkthrough, screencast, full 20-user benchmark and a future VPS deployment require their respective running environments. The local `0_plans` directory contains the original detailed plans; ignored files remain local unless explicitly added.

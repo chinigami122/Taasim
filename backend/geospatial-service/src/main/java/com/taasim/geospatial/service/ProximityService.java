@@ -34,6 +34,13 @@ public class ProximityService {
         redisTemplate.opsForGeo().remove(GEO_KEY, driverId);
     }
 
+    public boolean reserve(String driverId, String tripId) {
+        String status = redisTemplate.opsForValue().get("driver:status:" + driverId);
+        if ("OFFLINE".equals(status) || "BUSY".equals(status)) return false;
+        Boolean claimed = redisTemplate.opsForValue().setIfAbsent("driver:reservation:" + driverId, tripId, java.time.Duration.ofMinutes(5));
+        return Boolean.TRUE.equals(claimed) || tripId.equals(redisTemplate.opsForValue().get("driver:reservation:" + driverId));
+    }
+
     /** Find drivers within radius meters of a coordinate, sorted by proximity */
     public List<Map<String, Object>> findNearby(double lat, double lon, double radiusMeters) {
         GeoResults<RedisGeoCommands.GeoLocation<String>> results =
@@ -51,6 +58,9 @@ public class ProximityService {
         if (results != null) {
             for (GeoResult<RedisGeoCommands.GeoLocation<String>> result : results) {
                 if (result.getContent() != null && result.getContent().getPoint() != null) {
+                    String driverId = result.getContent().getName();
+                    String status = redisTemplate.opsForValue().get("driver:status:" + driverId);
+                    if ("OFFLINE".equals(status) || "BUSY".equals(status) || Boolean.TRUE.equals(redisTemplate.hasKey("driver:reservation:" + driverId))) continue;
                     nearby.add(Map.of(
                             "driverId", result.getContent().getName(),
                             "distanceMeters", Math.round(result.getDistance().getValue() * 100.0) / 100.0,

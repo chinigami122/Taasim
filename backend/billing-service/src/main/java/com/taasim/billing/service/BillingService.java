@@ -28,6 +28,8 @@ public class BillingService {
     private final StripeChargeService stripeChargeService;
     private final ClientLookupService clientLookupService;
     private final Counter totalFareCounter;
+    @org.springframework.beans.factory.annotation.Value("${billing.auto-charge:false}")
+    private boolean autoCharge = false;
 
     @Autowired
     public BillingService(BillingRecordRepository repo,
@@ -87,7 +89,7 @@ public class BillingService {
         BillingRecord saved = repo.save(r);
 
         // Slice 16 — attempt Stripe charge (non-blocking, never rollback billing on failure)
-        tryCharge(saved);
+        if (autoCharge) tryCharge(saved);
 
         kafkaTemplate.send("billing.completed", tripId, Map.of(
                 "trip_id",       tripId,
@@ -126,6 +128,7 @@ public class BillingService {
     }
 
     public void retryCharge(BillingRecord record) {
+        if (!autoCharge) return;
         if (!"CALCULATED".equals(record.getStatus())) {
             return;
         }

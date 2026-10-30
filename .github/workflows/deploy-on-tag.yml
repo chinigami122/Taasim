@@ -1,0 +1,32 @@
+name: deploy-on-tag
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+jobs:
+  deploy:
+    # Deployment stays disabled until the owner explicitly enables this repository variable.
+    if: vars.DEPLOY_ENABLED == 'true'
+    environment: production
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - name: Configure verified host key
+        env:
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: mkdir -p ~/.ssh && printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+      - name: Deploy existing published images
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_ENV: ${{ secrets.DEPLOY_ENV }}
+        run: |
+          umask 077
+          printf '%s\n' "$DEPLOY_ENV" > "$RUNNER_TEMP/taasim.env"
+          DEPLOY_ENV_FILE="$RUNNER_TEMP/taasim.env" bash deploy/deploy.sh

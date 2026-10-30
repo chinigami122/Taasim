@@ -62,3 +62,11 @@ yarn-error.log*
 pnpm-debug.log*
 **/.tsbuildinfo
 
+
+# Local validation output
+/backend-*.log
+/frontend-build.log
+/smoke-logs.txt
+/tests/load/results/
+
+/frontend-*.log

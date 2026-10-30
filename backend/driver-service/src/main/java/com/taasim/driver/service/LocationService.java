@@ -118,7 +118,10 @@ public class LocationService {
         );
 
         // ── 3. Sync to Redis Geospatial Index ──
-        syncToGeospatial(request.getDriverId(), request.getLat(), request.getLon());
+        if (driverService == null || (!"BUSY".equals(driverService.getDriverStatus(request.getDriverId()))
+                && !"OFFLINE".equals(driverService.getDriverStatus(request.getDriverId())))) {
+            syncToGeospatial(request.getDriverId(), request.getLat(), request.getLon());
+        }
 
         // ── 4. Track Ride Distance in DriverService if ride is in progress ──
         if (driverService != null) {

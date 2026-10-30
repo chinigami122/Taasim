@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
-import { CreditCard, CheckCircle2, AlertCircle, ShieldCheck, Sparkles } from 'lucide-react';
+import { CreditCard, CheckCircle2, AlertCircle } from 'lucide-react';
 
 const stripePk = import.meta.env.VITE_STRIPE_PK || '';
 const isRealStripeKey = Boolean(stripePk && stripePk.startsWith('pk_') && !stripePk.includes('placeholder'));
@@ -35,7 +35,7 @@ function StripeRealForm({ tripId, amountMinor, onPaymentSuccess }: InnerFormProp
 
       if (result.error) {
         setErrorMsg(result.error.message || 'Payment confirmation failed');
-      } else {
+      } else if (result.paymentIntent?.status === 'succeeded') {
         setSuccess(true);
         onPaymentSuccess?.();
       }
@@ -79,130 +79,7 @@ function StripeRealForm({ tripId, amountMinor, onPaymentSuccess }: InnerFormProp
   );
 }
 
-function MockPaymentForm({ tripId, amountMinor, onPaymentSuccess }: InnerFormProps) {
-  const [cardNumber, setCardNumber] = useState('4242 4242 4242 4242');
-  const [expiry, setExpiry] = useState('12/28');
-  const [cvc, setCvc] = useState('123');
-  const [loading, setLoading] = useState(false);
-  const [paid, setPaid] = useState(false);
-
-  const handlePay = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setPaid(true);
-      onPaymentSuccess?.();
-    }, 900);
-  };
-
-  if (paid) {
-    return (
-      <div className="payment-success-card" style={{
-        padding: '24px',
-        textAlign: 'center',
-        background: 'rgba(16, 185, 129, 0.08)',
-        border: '1px solid rgba(16, 185, 129, 0.25)',
-        borderRadius: '12px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '8px'
-      }}>
-        <div style={{
-          width: '56px',
-          height: '56px',
-          borderRadius: '50%',
-          background: 'rgba(16, 185, 129, 0.15)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#10b981'
-        }}>
-          <CheckCircle2 size={32} />
-        </div>
-        <h4 style={{ margin: '8px 0 2px', color: '#10b981', fontSize: '1.1rem' }}>Payment Confirmed ✅</h4>
-        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-          Stripe mock charge settled for Trip #{tripId.slice(0, 8)}
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <form onSubmit={handlePay} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        fontSize: '0.78rem',
-        padding: '8px 12px',
-        borderRadius: '8px',
-        background: 'rgba(255, 184, 0, 0.08)',
-        border: '1px solid rgba(255, 184, 0, 0.2)',
-        color: '#f59e0b'
-      }}>
-        <Sparkles size={16} />
-        <span>Stripe Sandbox Mode — Test Card Loaded</span>
-      </div>
-
-      <div className="input-group">
-        <label className="label">Card Number</label>
-        <div style={{ position: 'relative' }}>
-          <input
-            className="input"
-            value={cardNumber}
-            onChange={(e) => setCardNumber(e.target.value)}
-            placeholder="4242 4242 4242 4242"
-            required
-            style={{ paddingLeft: '38px', fontFamily: 'monospace' }}
-          />
-          <CreditCard
-            size={18}
-            style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}
-          />
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <div className="input-group">
-          <label className="label">Expires</label>
-          <input
-            className="input"
-            value={expiry}
-            onChange={(e) => setExpiry(e.target.value)}
-            placeholder="MM/YY"
-            required
-            style={{ fontFamily: 'monospace' }}
-          />
-        </div>
-        <div className="input-group">
-          <label className="label">CVC</label>
-          <input
-            className="input"
-            value={cvc}
-            onChange={(e) => setCvc(e.target.value)}
-            placeholder="123"
-            required
-            style={{ fontFamily: 'monospace' }}
-          />
-        </div>
-      </div>
-
-      <button
-        type="submit"
-        disabled={loading}
-        className="btn btn-primary"
-        style={{ width: '100%', marginTop: '6px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
-      >
-        <ShieldCheck size={18} />
-        {loading ? 'Authorizing Payment...' : `Pay ${amountMinor ? (amountMinor / 100).toFixed(2) : '25.00'} MAD`}
-      </button>
-    </form>
-  );
-}
-
-export interface PaymentPanelProps {
+interface PaymentPanelProps {
   tripId: string;
   clientSecret: string;
   amountMinor?: number;
@@ -272,11 +149,7 @@ export default function PaymentPanel({
           />
         </Elements>
       ) : (
-        <MockPaymentForm
-          tripId={tripId}
-          amountMinor={amountMinor}
-          onPaymentSuccess={onPaymentSuccess}
-        />
+        <p role="status">Checkout is unavailable. Configure Stripe test keys and retry fetching the fare. No payment has been taken.</p>
       )}
     </div>
   );

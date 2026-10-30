@@ -90,6 +90,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
                     accessor.setUser(new UsernamePasswordAuthenticationToken(userId, null, authorities));
                 }
+                if (accessor != null && StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+                    String destination = accessor.getDestination();
+                    if (destination != null && destination.startsWith("/topic/drivers/")) {
+                        String expected = "/topic/drivers/" + (accessor.getUser() == null ? "" : accessor.getUser().getName()) + "/offers";
+                        if (!destination.equals(expected)) throw new MessageDeliveryException("Cannot subscribe to another driver's offers");
+                    }
+                }
                 return message;
             }
         });

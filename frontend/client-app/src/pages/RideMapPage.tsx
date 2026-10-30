@@ -6,7 +6,6 @@ import {
   Compass,
   RotateCcw,
   Radio,
-  Zap,
 } from 'lucide-react';
 import { TripsService } from '../api';
 import { subscribeToTrip, type Loc } from '../ws/trackingClient';
@@ -71,7 +70,7 @@ const driverIcon = L.divIcon({
     box-shadow: 0 0 20px rgba(245, 158, 11, 0.8);
     border: 2px solid #ffffff;
     animation: pulse 1.8s infinite;
-  ">🚕</div>`,
+  ">ðŸš•</div>`,
   iconSize: [36, 36],
   iconAnchor: [18, 18],
 });
@@ -135,17 +134,12 @@ export default function RideMapPage() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
-      if (res.ok) {
-        const data = await res.json();
-        setClientSecret(data.clientSecret || `pi_mock_${tId}_secret_mock`);
-        if (data.amount) setFareAmount(data.amount);
-      } else {
-        // Fallback to mock secret if billing service returns non-200
-        setClientSecret(`pi_mock_${tId}_secret_mock`);
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Checkout unavailable');
+      setClientSecret(data.clientSecret);
+      setFareAmount(data.amount);
     } catch (err) {
-      console.warn('Error fetching payment intent:', err);
-      setClientSecret(`pi_mock_${tId}_secret_mock`);
+      setErrorMsg(err instanceof Error ? err.message : 'Checkout unavailable');
     }
   };
 
@@ -203,13 +197,12 @@ export default function RideMapPage() {
     setErrorMsg(null);
 
     try {
-      const riderId = localStorage.getItem('user_email') || 'client@taasim.ma';
+
       // Default to Casablanca zones (e.g. Zone 5: Moulay Rachid -> Zone 12: Assoukhour Assawda)
       const res: any = await TripsService.requestTrip({
         requestBody: {
-          riderId,
-          originZone: 5,
-          destinationZone: 12,
+          riderId: localStorage.getItem("userId") || "",
+
           originLat: origin[0],
           originLon: origin[1],
           destinationLat: dest[0],
@@ -248,117 +241,6 @@ export default function RideMapPage() {
     }
   };
 
-  const [isSimulating, setIsSimulating] = useState(false);
-
-  const simulateDriverDrive = async () => {
-    if (!tripId) return;
-    setIsSimulating(true);
-    setErrorMsg(null);
-
-    try {
-      const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
-
-      // 1. Determine assigned driver
-      let activeDriver = driverId;
-      if (!activeDriver) {
-        try {
-          const tripInfo: any = await TripsService.getTrip({ tripId });
-          activeDriver = tripInfo.driverId || tripInfo.driver_id;
-        } catch {}
-      }
-      if (!activeDriver) activeDriver = 'taxi_casablanca_001';
-      setDriverId(activeDriver);
-
-      // 2. Authenticate simulator driver
-      let dToken = localStorage.getItem('driver_sim_token');
-      if (!dToken) {
-        const dEmail = 'driver_sim_map@taasim.ma';
-        const dPass = 'Password123!';
-        try {
-          await fetch(`${apiBase}/api/auth/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: dEmail, password: dPass, fullName: 'Simulated Driver', role: 'DRIVER' })
-          });
-        } catch {}
-        const loginRes = await fetch(`${apiBase}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: dEmail, password: dPass })
-        });
-        if (loginRes.ok) {
-          const data = await loginRes.json();
-          dToken = data.accessToken;
-          if (dToken) localStorage.setItem('driver_sim_token', dToken);
-        }
-      }
-
-      // 3. Accept trip
-      try {
-        await fetch(`${apiBase}/api/drivers/trips/${activeDriver}/accept`, {
-          method: 'PUT',
-          headers: { Authorization: `Bearer ${dToken}` }
-        });
-      } catch {}
-
-      // 4. Start trip
-      try {
-        await fetch(`${apiBase}/api/drivers/trips/${activeDriver}/start`, {
-          method: 'PUT',
-          headers: { Authorization: `Bearer ${dToken}` }
-        });
-        setStatus('IN_PROGRESS');
-      } catch {}
-
-      // 5. Send location pings moving from origin to destination
-      const startLat = origin ? origin[0] : 33.5735;
-      const startLon = origin ? origin[1] : -7.5895;
-      const endLat = dest ? dest[0] : 33.5900;
-      const endLon = dest ? dest[1] : -7.6100;
-
-      for (let i = 0; i <= 5; i++) {
-        const ratio = i / 5;
-        const curLat = startLat + (endLat - startLat) * ratio;
-        const curLon = startLon + (endLon - startLon) * ratio;
-
-        await fetch(`${apiBase}/api/drivers/location`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${dToken}`
-          },
-          body: JSON.stringify({
-            driverId: activeDriver,
-            lat: curLat,
-            lon: curLon,
-            speed: 8.0 + i * 2.5
-          })
-        });
-
-        // Set local pos as well
-        setDriverPos([curLat, curLon]);
-        setDriverSpeed(8.0 + i * 2.5);
-        setLastPingTime(new Date().toLocaleTimeString());
-
-        await new Promise((r) => setTimeout(r, 1200));
-      }
-
-      // 6. Complete trip
-      try {
-        await fetch(`${apiBase}/api/drivers/trips/${activeDriver}/complete`, {
-          method: 'PUT',
-          headers: { Authorization: `Bearer ${dToken}` }
-        });
-        setStatus('COMPLETED');
-        fetchPaymentIntent(tripId);
-      } catch {}
-    } catch (err: any) {
-      console.error('Simulation failed:', err);
-      setErrorMsg(err?.message || 'Driver simulation encountered an error');
-    } finally {
-      setIsSimulating(false);
-    }
-  };
 
   // Status Badge color
   const getStatusBadge = () => {
@@ -596,7 +478,7 @@ export default function RideMapPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Trip ID</span>
               <span style={{ fontSize: '0.82rem', fontFamily: 'monospace', color: '#6366f1', fontWeight: 600 }}>
-                {tripId.slice(0, 13)}…
+                {tripId.slice(0, 13)}â€¦
               </span>
             </div>
 
@@ -625,47 +507,27 @@ export default function RideMapPage() {
                 <Radio size={14} className="animate-pulse" />
                 <span>
                   Live GPS: {driverPos[0].toFixed(4)}, {driverPos[1].toFixed(4)}
-                  {driverSpeed !== null ? ` • ${(driverSpeed * 3.6).toFixed(1)} km/h` : ''}
+                  {driverSpeed !== null ? ` â€¢ ${(driverSpeed * 3.6).toFixed(1)} km/h` : ''}
                   {lastPingTime ? ` (${lastPingTime})` : ''}
                 </span>
               </div>
             )}
 
-            {tripId && (status === 'MATCHED' || status === 'IN_PROGRESS') && (
-              <button
-                onClick={simulateDriverDrive}
-                disabled={isSimulating}
-                className="btn btn-primary"
-                style={{
-                  marginTop: '4px',
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                  color: '#090d16',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 0 15px rgba(245, 158, 11, 0.4)',
-                }}
-              >
-                <Zap size={18} />
-                {isSimulating ? 'Simulating Taxi Drive...' : 'Simulate Taxi Drive 🚕'}
-              </button>
-            )}
+
           </div>
         )}
 
         {/* Step 5 Payment Panel when Trip is COMPLETED */}
         {status === 'COMPLETED' && (
           <div style={{ marginTop: '8px' }}>
-            <PaymentPanel
+            <><button className="btn btn-secondary" onClick={() => fetchPaymentIntent(tripId!)}>Refresh fare / retry checkout</button><PaymentPanel
               tripId={tripId || ''}
-              clientSecret={clientSecret || `pi_mock_${tripId}_secret_mock`}
+              clientSecret={clientSecret || ''}
               amountMinor={fareAmount}
               onPaymentSuccess={() => {
                 setStatus('PAID');
               }}
-            />
+            /></>
           </div>
         )}
       </div>
@@ -733,7 +595,7 @@ export default function RideMapPage() {
         {driverPos && (
           <Marker position={driverPos} icon={driverIcon}>
             <Popup>
-              <strong>🚕 {driverId || 'Assigned Driver'}</strong>
+              <strong>ðŸš• {driverId || 'Assigned Driver'}</strong>
               <br />
               Speed: {driverSpeed !== null ? `${(driverSpeed * 3.6).toFixed(1)} km/h` : 'N/A'}
               <br />

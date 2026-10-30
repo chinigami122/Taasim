@@ -12,6 +12,7 @@ class TripRequestConsumerTest {
     void onTripRequest_withCoordinates_matchesAndPublishes() {
         MatchingEngine matchingEngine = mock(MatchingEngine.class);
         MatchEventProducer matchEventProducer = mock(MatchEventProducer.class);
+        lenient().when(matchingEngine.reserveDriver(anyString(), anyString())).thenReturn(true);
         TripRequestConsumer consumer = new TripRequestConsumer(matchingEngine, matchEventProducer);
 
         String payload = """
@@ -34,6 +35,7 @@ class TripRequestConsumerTest {
     void onTripRequest_validPayloadAndMatchFound_publishesMatchEvent() {
         MatchingEngine matchingEngine = mock(MatchingEngine.class);
         MatchEventProducer matchEventProducer = mock(MatchEventProducer.class);
+        lenient().when(matchingEngine.reserveDriver(anyString(), anyString())).thenReturn(true);
         TripRequestConsumer consumer = new TripRequestConsumer(matchingEngine, matchEventProducer);
 
         String payload = """
@@ -56,6 +58,7 @@ class TripRequestConsumerTest {
     void onTripRequest_validPayloadButNoMatch_doesNotPublishEvent() {
         MatchingEngine matchingEngine = mock(MatchingEngine.class);
         MatchEventProducer matchEventProducer = mock(MatchEventProducer.class);
+        lenient().when(matchingEngine.reserveDriver(anyString(), anyString())).thenReturn(true);
         TripRequestConsumer consumer = new TripRequestConsumer(matchingEngine, matchEventProducer);
 
         String payload = """
@@ -74,6 +77,7 @@ class TripRequestConsumerTest {
     void onTripRequest_malformedJson_throwsExceptionAndDoesNotInteract() {
         MatchingEngine matchingEngine = mock(MatchingEngine.class);
         MatchEventProducer matchEventProducer = mock(MatchEventProducer.class);
+        lenient().when(matchingEngine.reserveDriver(anyString(), anyString())).thenReturn(true);
         TripRequestConsumer consumer = new TripRequestConsumer(matchingEngine, matchEventProducer);
 
         assertThrows(RuntimeException.class, () -> consumer.onTripRequest("not json at all"));

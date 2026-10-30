@@ -1,34 +1,60 @@
 name: frontend-ci
-
 on:
   push:
     branches: [main, develop]
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend-ci.yml'
+    paths: ['frontend/**', '.github/workflows/frontend-ci.yml']
   pull_request:
-    branches: [main]
-    paths:
-      - 'frontend/**'
-
+    paths: ['frontend/**', '.github/workflows/frontend-ci.yml']
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        app: [client-app]
+        app: [client-app, driver-app, admin-app]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/${{ matrix.app }}/package-lock.json
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - run: npm ci
-        working-directory: frontend/${{ matrix.app }}
-      - run: npm run lint --if-present
-        working-directory: frontend/${{ matrix.app }}
-      - run: npm test --if-present -- --run
-        working-directory: frontend/${{ matrix.app }}
-      - run: npm run build
-        working-directory: frontend/${{ matrix.app }}
+        working-directory: frontend
+      - run: npm run lint --workspace=${{ matrix.app }}
+        working-directory: frontend
+      - run: npm run build --workspace=${{ matrix.app }}
+        working-directory: frontend
+
+  publish:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        app: [client-app, driver-app, admin-app]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          build-args: |
+            APP=${{ matrix.app }}
+            VITE_API_BASE=${{ vars.PUBLIC_API_BASE || 'http://localhost:8080' }}
+            VITE_WS_BASE=${{ vars.PUBLIC_WS_BASE || 'http://localhost:8080/ws/tracking' }}
+            VITE_STRIPE_PK=${{ vars.VITE_STRIPE_PK }}
+          tags: |
+            ghcr.io/chinigami122/taasim/${{ matrix.app }}:latest
+            ghcr.io/chinigami122/taasim/${{ matrix.app }}:git-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

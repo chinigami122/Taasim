@@ -31,7 +31,7 @@ class ProximityServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(redisTemplate.opsForGeo()).thenReturn(geoOperations);
+        lenient().when(redisTemplate.opsForGeo()).thenReturn(geoOperations);
         proximityService = new ProximityService(redisTemplate);
     }
 
@@ -44,6 +44,16 @@ class ProximityServiceTest {
                 eq(new Point(-7.5898, 33.5731)),
                 eq("taxi_001")
         );
+    }
+
+    @Test
+    void reservationExcludesConcurrentTripsAndAllowsReplay() {
+        org.springframework.data.redis.core.ValueOperations<String, String> values = mock(org.springframework.data.redis.core.ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(values);
+        when(values.setIfAbsent(eq("driver:reservation:driver"), eq("trip-2"), any(java.time.Duration.class))).thenReturn(false);
+        when(values.get("driver:reservation:driver")).thenReturn("trip-1");
+        assertThat(proximityService.reserve("driver", "trip-2")).isFalse();
+        assertThat(proximityService.reserve("driver", "trip-1")).isTrue();
     }
 
     @Test
@@ -66,6 +76,7 @@ class ProximityServiceTest {
         when(geoOperations.radius(eq(ProximityService.GEO_KEY), any(Circle.class), any(RedisGeoCommands.GeoRadiusCommandArgs.class)))
                 .thenReturn(geoResults);
 
+        when(redisTemplate.opsForValue()).thenReturn(mock(org.springframework.data.redis.core.ValueOperations.class));
         List<Map<String, Object>> nearby = proximityService.findNearby(33.5731, -7.5898, 2000);
 
         assertThat(nearby).hasSize(1);

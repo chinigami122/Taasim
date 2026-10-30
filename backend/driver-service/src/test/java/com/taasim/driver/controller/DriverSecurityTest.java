@@ -113,12 +113,20 @@ class DriverSecurityTest {
     void acceptTrip_driverToken_returns200() throws Exception {
         String driverToken = generateToken("driver-1", "DRIVER");
 
-        when(driverService.acceptTrip("taxi_001")).thenReturn(true);
-        when(driverService.getActiveTrip("taxi_001")).thenReturn("trip-123");
+        when(driverService.acceptTrip("driver-1")).thenReturn(true);
+        when(driverService.getActiveTrip("driver-1")).thenReturn("trip-123");
 
-        mockMvc.perform(put("/api/drivers/trips/taxi_001/accept")
+        mockMvc.perform(put("/api/drivers/trips/driver-1/accept")
                         .header("Authorization", "Bearer " + driverToken))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void driverCannotAcceptAnotherDriversTrip() throws Exception {
+        mockMvc.perform(put("/api/drivers/trips/driver-2/accept")
+                .header("Authorization", "Bearer " + generateToken("driver-1", "DRIVER")))
+                .andExpect(status().isForbidden());
+        org.mockito.Mockito.verifyNoInteractions(driverService);
     }
 
     @Test

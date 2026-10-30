@@ -48,7 +48,9 @@ public class TripController {
     public ResponseEntity<Map<String, Object>> requestTrip(
             @RequestBody TripRequestDto request,
             @RequestHeader(value = "X-User-Id", required = false) String userId) {
-        Trip trip = tripService.createTrip(request, userId);
+        String authenticatedId = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        request.setRiderId(authenticatedId);
+        Trip trip = tripService.createTrip(request, authenticatedId);
 
         return ResponseEntity.ok(Map.of(
                 "tripId", trip.getTripId(),

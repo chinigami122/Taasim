@@ -23,6 +23,11 @@ public class GeospatialController {
         this.proximityService = proximityService;
     }
 
+    @PostMapping("/drivers/{driverId}/reserve")
+    public Map<String, Boolean> reserve(@PathVariable String driverId, @RequestParam String tripId) {
+        return Map.of("reserved", proximityService.reserve(driverId, tripId));
+    }
+
     @Operation(summary = "Update driver position in Redis GEO index")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Position updated successfully")

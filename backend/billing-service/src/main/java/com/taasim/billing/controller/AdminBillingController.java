@@ -25,7 +25,15 @@ public class AdminBillingController {
 
     @Operation(summary = "Get daily revenue, commission, and payout summary")
     @GetMapping("/summary")
-    public ResponseEntity<?> summary(@RequestParam(required = false) String date) {
+    public ResponseEntity<?> summary(@RequestParam(required = false) String date,
+            @RequestParam(required = false) Integer days) {
+        if (days != null) {
+            if (days < 1 || days > 90) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "days must be 1..90");
+            LocalDate endDate = date == null ? LocalDate.now(ZoneId.of("Africa/Casablanca")) : LocalDate.parse(date);
+            List<Object> series = new ArrayList<>();
+            for (int i = days - 1; i >= 0; i--) series.add(summary(endDate.minusDays(i).toString(), null).getBody());
+            return ResponseEntity.ok(series);
+        }
         ZoneId tz = ZoneId.of("Africa/Casablanca");
         LocalDate d = (date == null || date.isBlank()) ? LocalDate.now(tz) : LocalDate.parse(date.trim());
         Instant start = d.atStartOfDay(tz).toInstant();

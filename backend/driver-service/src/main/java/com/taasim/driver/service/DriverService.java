@@ -70,6 +70,25 @@ public class DriverService {
         this.redisTemplate = redisTemplate;
     }
 
+    public synchronized void setOnline(String driverId, boolean online) {
+        if (!online && (activeTrips.containsKey(driverId) || pendingTrips.containsKey(driverId))) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "Finish or reject your trip before going offline");
+        }
+        driverStatus.put(driverId, online ? "AVAILABLE" : "OFFLINE");
+        if (redisTemplate != null) {
+            redisTemplate.opsForValue().set("driver:status:" + driverId, online ? "AVAILABLE" : "OFFLINE");
+            if (!online) redisTemplate.opsForGeo().remove("drivers:available", driverId);
+        }
+        if (online) {
+            double[] position = lastPositions.get(driverId);
+            if (position != null && redisTemplate != null) redisTemplate.opsForGeo().add("drivers:available", new org.springframework.data.geo.Point(position[1], position[0]), driverId);
+        }
+    }
+
+    private void releaseReservation(String driverId) {
+        if (redisTemplate != null) redisTemplate.delete("driver:reservation:" + driverId);
+    }
+
     /** Called when a match event assigns a trip to this driver */
     public void assignTrip(String driverId, String tripId, int etaSeconds) {
         pendingTrips.put(driverId, tripId);
@@ -93,6 +112,10 @@ public class DriverService {
 
         activeTrips.put(driverId, tripId);
         driverStatus.put(driverId, "BUSY");
+        if (redisTemplate != null) {
+            redisTemplate.opsForValue().set("driver:status:" + driverId, "BUSY");
+            redisTemplate.opsForGeo().remove("drivers:available", driverId);
+        }
 
         tripStatusProducer.send(tripId, driverId, "ACCEPTED");
         System.out.println("✅ Driver " + driverId + " accepted trip " + tripId);
@@ -104,6 +127,7 @@ public class DriverService {
         String tripId = pendingTrips.remove(driverId);
         if (tripId == null) return false;
 
+        releaseReservation(driverId);
         tripStatusProducer.send(tripId, driverId, "REJECTED");
         System.out.println("❌ Driver " + driverId + " rejected trip " + tripId);
         return true;
@@ -163,7 +187,8 @@ public class DriverService {
             return false;
         }
 
-        driverStatus.put(driverId, "AVAILABLE");
+        releaseReservation(driverId);
+        setOnline(driverId, true);
 
         Instant start = tripStartTimes.remove(tripId);
         Double distanceKm = tripDistances.remove(tripId);
@@ -342,6 +367,7 @@ public class DriverService {
         detail.put("status", status);
         detail.put("activeTrip", activeTrips.get(driverId));
         detail.put("pendingTrip", pendingTrips.get(driverId));
+        detail.put("rideStatus", activeTrips.containsKey(driverId) ? (tripStartTimes.containsKey(activeTrips.get(driverId)) ? "IN_PROGRESS" : "ACCEPTED") : "IDLE");
         detail.put("lat", lat);
         detail.put("lon", lon);
         detail.put("recentTrips", findTripsForDriver(driverId, 10));
@@ -375,6 +401,7 @@ public class DriverService {
         }
 
         for (Map.Entry<String, double[]> entry : lastPositions.entrySet()) {
+            if ("OFFLINE".equals(driverStatus.get(entry.getKey()))) continue;
             String dId = entry.getKey();
             double[] coords = entry.getValue();
             String status = activeTrips.containsKey(dId) ? "BUSY" : driverStatus.getOrDefault(dId, "AVAILABLE");
@@ -388,4 +415,4 @@ public class DriverService {
 
         return new ArrayList<>(positionsMap.values());
     }
-}
+}
