@@ -82,7 +82,7 @@ docker run --rm --network host -v "${PWD}/tests/load:/scripts:ro" grafana/k6:1.3
 
 `smoke_demo.mjs` registers isolated accounts and verifies dispatch, accept/start/complete, GPS, fare creation, earnings, admin reporting, role rejection and offline behavior. k6 separately measures request and status endpoints: 20 virtual users, request p95 <800 ms, status p95 <200 ms, HTTP failures <1%. It does not simulate payment or claim to load-test full dispatch. Results must be measured on the target environment; no performance numbers are fabricated.
 
-GitHub Actions runs backend tests/container builds, all three frontend builds, and an isolated end-to-end/k6 smoke workflow. Logs are retained as workflow artifacts. The existing auth integration test now runs in Maven's `verify` phase through Failsafe.
+GitHub Actions runs backend tests/container builds, all three frontend builds, and an isolated end-to-end workflow with the full 20-user k6 scenario. Logs are retained as workflow artifacts. The existing auth integration test now runs in Maven's `verify` phase through Failsafe.
 
 ## Deployment is deferred
 

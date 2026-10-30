@@ -130,7 +130,7 @@
         "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}",
         "STRIPE_WEBHOOK_SECRET": "${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}",
         "BILLING_AUTO_CHARGE": "false",
-        "JAVA_TOOL_OPTIONS": "-Xms64m -Xmx256m -XX:+UseSerialGC",
+        "JAVA_TOOL_OPTIONS": "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC",
         "MANAGEMENT_TRACING_ENABLED": "false",
         "SERVER_PORT": "8081"
       },
@@ -148,7 +148,17 @@
           "condition": "service_completed_successfully"
         }
       },
-      "restart": "unless-stopped"
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8081/actuator/health || exit 1"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "120s",
+        "retries": 18
+      }
     },
     "trip-service": {
       "build": {
@@ -180,7 +190,7 @@
         "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}",
         "STRIPE_WEBHOOK_SECRET": "${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}",
         "BILLING_AUTO_CHARGE": "false",
-        "JAVA_TOOL_OPTIONS": "-Xms64m -Xmx256m -XX:+UseSerialGC",
+        "JAVA_TOOL_OPTIONS": "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC",
         "MANAGEMENT_TRACING_ENABLED": "false",
         "SERVER_PORT": "8082"
       },
@@ -198,7 +208,17 @@
           "condition": "service_completed_successfully"
         }
       },
-      "restart": "unless-stopped"
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8082/actuator/health || exit 1"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "120s",
+        "retries": 18
+      }
     },
     "driver-service": {
       "build": {
@@ -230,7 +250,7 @@
         "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}",
         "STRIPE_WEBHOOK_SECRET": "${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}",
         "BILLING_AUTO_CHARGE": "false",
-        "JAVA_TOOL_OPTIONS": "-Xms64m -Xmx256m -XX:+UseSerialGC",
+        "JAVA_TOOL_OPTIONS": "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC",
         "MANAGEMENT_TRACING_ENABLED": "false",
         "SERVER_PORT": "8083"
       },
@@ -248,7 +268,17 @@
           "condition": "service_completed_successfully"
         }
       },
-      "restart": "unless-stopped"
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8083/actuator/health || exit 1"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "120s",
+        "retries": 18
+      }
     },
     "geospatial-service": {
       "build": {
@@ -280,7 +310,7 @@
         "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}",
         "STRIPE_WEBHOOK_SECRET": "${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}",
         "BILLING_AUTO_CHARGE": "false",
-        "JAVA_TOOL_OPTIONS": "-Xms64m -Xmx256m -XX:+UseSerialGC",
+        "JAVA_TOOL_OPTIONS": "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC",
         "MANAGEMENT_TRACING_ENABLED": "false",
         "SERVER_PORT": "8084"
       },
@@ -298,7 +328,17 @@
           "condition": "service_completed_successfully"
         }
       },
-      "restart": "unless-stopped"
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8084/actuator/health || exit 1"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "120s",
+        "retries": 18
+      }
     },
     "matching-service": {
       "build": {
@@ -330,7 +370,7 @@
         "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}",
         "STRIPE_WEBHOOK_SECRET": "${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}",
         "BILLING_AUTO_CHARGE": "false",
-        "JAVA_TOOL_OPTIONS": "-Xms64m -Xmx256m -XX:+UseSerialGC",
+        "JAVA_TOOL_OPTIONS": "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC",
         "MANAGEMENT_TRACING_ENABLED": "false",
         "SERVER_PORT": "8085"
       },
@@ -348,7 +388,17 @@
           "condition": "service_completed_successfully"
         }
       },
-      "restart": "unless-stopped"
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8085/actuator/health || exit 1"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "120s",
+        "retries": 18
+      }
     },
     "billing-service": {
       "build": {
@@ -380,7 +430,7 @@
         "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}",
         "STRIPE_WEBHOOK_SECRET": "${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}",
         "BILLING_AUTO_CHARGE": "false",
-        "JAVA_TOOL_OPTIONS": "-Xms64m -Xmx256m -XX:+UseSerialGC",
+        "JAVA_TOOL_OPTIONS": "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC",
         "MANAGEMENT_TRACING_ENABLED": "false",
         "SERVER_PORT": "8086"
       },
@@ -398,7 +448,17 @@
           "condition": "service_completed_successfully"
         }
       },
-      "restart": "unless-stopped"
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8086/actuator/health || exit 1"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "120s",
+        "retries": 18
+      }
     },
     "gateway-service": {
       "build": {
@@ -430,7 +490,7 @@
         "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}",
         "STRIPE_WEBHOOK_SECRET": "${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}",
         "BILLING_AUTO_CHARGE": "false",
-        "JAVA_TOOL_OPTIONS": "-Xms64m -Xmx256m -XX:+UseSerialGC",
+        "JAVA_TOOL_OPTIONS": "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC",
         "MANAGEMENT_TRACING_ENABLED": "false",
         "SERVER_PORT": "8080"
       },
@@ -451,7 +511,17 @@
       "restart": "unless-stopped",
       "ports": [
         "${GATEWAY_PORT:-8080}:8080"
-      ]
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8080/actuator/health || exit 1"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "120s",
+        "retries": 18
+      }
     },
     "client-app": {
       "profiles": [
