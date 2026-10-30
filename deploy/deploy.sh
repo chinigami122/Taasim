@@ -4,7 +4,8 @@ set -euo pipefail
 : "${DEPLOY_USER:?set DEPLOY_USER}"
 : "${DEPLOY_ENV_FILE:?set path to server environment file}"
 # Run explicitly when deployment is approved. No deployment happens during normal CI.
-ssh "$DEPLOY_USER@$DEPLOY_HOST" 'mkdir -p ~/taasim/src'
+ssh "$DEPLOY_USER@$DEPLOY_HOST" 'mkdir -p ~/taasim/src ~/taasim/scripts'
+scp scripts/demo-postgres-init.sql "$DEPLOY_USER@$DEPLOY_HOST:~/taasim/scripts/demo-postgres-init.sql"
 scp src/cassandra_schema.cql "$DEPLOY_USER@$DEPLOY_HOST:~/taasim/src/cassandra_schema.cql"
 scp docker-compose.demo.yml "$DEPLOY_USER@$DEPLOY_HOST:~/taasim/docker-compose.yml"
 scp "$DEPLOY_ENV_FILE" "$DEPLOY_USER@$DEPLOY_HOST:~/taasim/.env"

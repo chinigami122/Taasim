@@ -36,7 +36,8 @@
         "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:-taasim}"
       },
       "volumes": [
-        "demo_postgres:/var/lib/postgresql/data"
+        "demo_postgres:/var/lib/postgresql/data",
+        "./scripts/demo-postgres-init.sql:/docker-entrypoint-initdb.d/10-billing.sql:ro"
       ],
       "healthcheck": {
         "test": [
@@ -359,7 +360,7 @@
         "JWT_SECRET": "${JWT_SECRET:-dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}",
         "POSTGRES_HOST": "postgres",
         "POSTGRES_PORT": "5432",
-        "POSTGRES_DB": "taasim",
+        "POSTGRES_DB": "taasim_billing",
         "POSTGRES_USER": "taasim",
         "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:-taasim}",
         "CASSANDRA_HOST": "cassandra",
