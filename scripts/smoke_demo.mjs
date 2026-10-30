@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 const base = process.env.BASE || "http://localhost:8080";
 const suffix = Date.now();
+// A fresh synthetic location avoids matching stale drivers in an existing stack.
+const pickupLat = 33.60 + Math.random() * 0.01;
+const pickupLon = -7.54 + Math.random() * 0.01;
+const destinationLat = pickupLat + 0.01;
 async function request(path, token, body, method = body ? "POST" : "GET") {
   const response = await fetch(base + path, {
     method,
@@ -78,16 +82,16 @@ await request(
   "PUT",
 );
 await request("/api/drivers/location", driver.token, {
-  lat: 33.5731,
-  lon: -7.5898,
+  lat: pickupLat,
+  lon: pickupLon,
   speed: 0,
 });
 const offers = await liveSubscription(driver.token, `/topic/drivers/${driver.id}/offers`);
 const trip = await request("/api/trips/request", client.token, {
-  originLat: 33.5731,
-  originLon: -7.5898,
-  destinationLat: 33.5831,
-  destinationLon: -7.5898,
+  originLat: pickupLat,
+  originLon: pickupLon,
+  destinationLat: destinationLat,
+  destinationLon: pickupLon,
 });
 await until(
   () => request("/api/drivers/me/state", driver.token),
@@ -109,16 +113,16 @@ await request(
   "PUT",
 );
 await request("/api/drivers/location", driver.token, {
-  lat: 33.5731,
-  lon: -7.5898,
+  lat: pickupLat,
+  lon: pickupLon,
   speed: 5,
 });
 await request("/api/drivers/location", driver.token, {
-  lat: 33.5831,
-  lon: -7.5898,
+  lat: destinationLat,
+  lon: pickupLon,
   speed: 5,
 });
-await until(async () => tracking.messages, items => items.some(item => item.driverId === driver.id && item.lat === 33.5831), "live driver tracking");
+await until(async () => tracking.messages, items => items.some(item => item.driverId === driver.id && item.lat === destinationLat), "live driver tracking");
 offers.close(); tracking.close();
 await request(
   `/api/drivers/trips/${driver.id}/complete`,
@@ -183,3 +187,5 @@ console.log(
     2,
   ),
 );
+
+export { client, driver, admin, trip, request, account };

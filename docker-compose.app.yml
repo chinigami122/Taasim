@@ -1,0 +1,552 @@
+# Reversible app overlay for the original taasim project and existing volumes.
+# docker compose -f docker-compose.yml -f docker-compose.app.yml up -d --build
+name: taasim
+services:
+  kafka:
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list
+      interval: 10s
+      timeout: 10s
+      retries: 30
+    environment:
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx384m
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+  postgres:
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U taasim -d taasim
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  redis:
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  cassandra:
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - cqlsh -e "DESCRIBE KEYSPACES"
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 45s
+  cassandra-init:
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    entrypoint:
+    - cqlsh
+    - cassandra
+    - '9042'
+    - -f
+    - /schema.cql
+  kafka-init:
+    depends_on:
+      kafka:
+        condition: service_healthy
+  auth-service:
+    build:
+      context: ./backend
+      dockerfile: auth-service/Dockerfile
+    image: taasim/auth-service:local
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: taasim
+      POSTGRES_USER: taasim
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-taasim}
+      CASSANDRA_HOST: cassandra
+      CASSANDRA_PORT: '9042'
+      CASSANDRA_DC: datacenter1
+      CASSANDRA_KEYSPACE: taasim
+      KAFKA_BOOTSTRAP: kafka:29092
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      GEOSPATIAL_SERVICE_URL: http://geospatial-service:8084
+      AUTH_SERVICE_URL: http://auth-service:8081
+      AUTH_SERVICE_URI: http://auth-service:8081
+      TRIP_SERVICE_URI: http://trip-service:8082
+      DRIVER_SERVICE_URI: http://driver-service:8083
+      GEO_SERVICE_URI: http://geospatial-service:8084
+      BILLING_SERVICE_URI: http://billing-service:8086
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+      BILLING_AUTO_CHARGE: 'false'
+      JAVA_TOOL_OPTIONS: -XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-true}
+      SERVER_PORT: '8081'
+      OTLP_ENDPOINT: http://tempo:4318/v1/traces
+      LOG_LEVEL_KAFKA: INFO
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: 'true'
+      SPRING_FLYWAY_BASELINE_VERSION: '0'
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget -q --spider http://localhost:8081/actuator/health || exit 1
+      interval: 10s
+      timeout: 5s
+      start_period: 120s
+      retries: 18
+    container_name: taasim-auth
+    ports:
+    - 8081:8081
+  trip-service:
+    build:
+      context: ./backend
+      dockerfile: trip-service/Dockerfile
+    image: taasim/trip-service:local
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: taasim
+      POSTGRES_USER: taasim
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-taasim}
+      CASSANDRA_HOST: cassandra
+      CASSANDRA_PORT: '9042'
+      CASSANDRA_DC: datacenter1
+      CASSANDRA_KEYSPACE: taasim
+      KAFKA_BOOTSTRAP: kafka:29092
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      GEOSPATIAL_SERVICE_URL: http://geospatial-service:8084
+      AUTH_SERVICE_URL: http://auth-service:8081
+      AUTH_SERVICE_URI: http://auth-service:8081
+      TRIP_SERVICE_URI: http://trip-service:8082
+      DRIVER_SERVICE_URI: http://driver-service:8083
+      GEO_SERVICE_URI: http://geospatial-service:8084
+      BILLING_SERVICE_URI: http://billing-service:8086
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+      BILLING_AUTO_CHARGE: 'false'
+      JAVA_TOOL_OPTIONS: -XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-true}
+      SERVER_PORT: '8082'
+      OTLP_ENDPOINT: http://tempo:4318/v1/traces
+      LOG_LEVEL_KAFKA: INFO
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget -q --spider http://localhost:8082/actuator/health || exit 1
+      interval: 10s
+      timeout: 5s
+      start_period: 120s
+      retries: 18
+    container_name: taasim-trip
+    ports:
+    - 8082:8082
+  driver-service:
+    build:
+      context: ./backend
+      dockerfile: driver-service/Dockerfile
+    image: taasim/driver-service:local
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: taasim
+      POSTGRES_USER: taasim
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-taasim}
+      CASSANDRA_HOST: cassandra
+      CASSANDRA_PORT: '9042'
+      CASSANDRA_DC: datacenter1
+      CASSANDRA_KEYSPACE: taasim
+      KAFKA_BOOTSTRAP: kafka:29092
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      GEOSPATIAL_SERVICE_URL: http://geospatial-service:8084
+      AUTH_SERVICE_URL: http://auth-service:8081
+      AUTH_SERVICE_URI: http://auth-service:8081
+      TRIP_SERVICE_URI: http://trip-service:8082
+      DRIVER_SERVICE_URI: http://driver-service:8083
+      GEO_SERVICE_URI: http://geospatial-service:8084
+      BILLING_SERVICE_URI: http://billing-service:8086
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+      BILLING_AUTO_CHARGE: 'false'
+      JAVA_TOOL_OPTIONS: -XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-true}
+      SERVER_PORT: '8083'
+      OTLP_ENDPOINT: http://tempo:4318/v1/traces
+      LOG_LEVEL_KAFKA: INFO
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget -q --spider http://localhost:8083/actuator/health || exit 1
+      interval: 10s
+      timeout: 5s
+      start_period: 120s
+      retries: 18
+    container_name: taasim-driver
+    ports:
+    - 8083:8083
+  geospatial-service:
+    build:
+      context: ./backend
+      dockerfile: geospatial-service/Dockerfile
+    image: taasim/geospatial-service:local
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: taasim
+      POSTGRES_USER: taasim
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-taasim}
+      CASSANDRA_HOST: cassandra
+      CASSANDRA_PORT: '9042'
+      CASSANDRA_DC: datacenter1
+      CASSANDRA_KEYSPACE: taasim
+      KAFKA_BOOTSTRAP: kafka:29092
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      GEOSPATIAL_SERVICE_URL: http://geospatial-service:8084
+      AUTH_SERVICE_URL: http://auth-service:8081
+      AUTH_SERVICE_URI: http://auth-service:8081
+      TRIP_SERVICE_URI: http://trip-service:8082
+      DRIVER_SERVICE_URI: http://driver-service:8083
+      GEO_SERVICE_URI: http://geospatial-service:8084
+      BILLING_SERVICE_URI: http://billing-service:8086
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+      BILLING_AUTO_CHARGE: 'false'
+      JAVA_TOOL_OPTIONS: -XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-true}
+      SERVER_PORT: '8084'
+      OTLP_ENDPOINT: http://tempo:4318/v1/traces
+      LOG_LEVEL_KAFKA: INFO
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget -q --spider http://localhost:8084/actuator/health || exit 1
+      interval: 10s
+      timeout: 5s
+      start_period: 120s
+      retries: 18
+    container_name: taasim-geospatial
+    ports:
+    - 8084:8084
+  matching-service:
+    build:
+      context: ./backend
+      dockerfile: matching-service/Dockerfile
+    image: taasim/matching-service:local
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: taasim
+      POSTGRES_USER: taasim
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-taasim}
+      CASSANDRA_HOST: cassandra
+      CASSANDRA_PORT: '9042'
+      CASSANDRA_DC: datacenter1
+      CASSANDRA_KEYSPACE: taasim
+      KAFKA_BOOTSTRAP: kafka:29092
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      GEOSPATIAL_SERVICE_URL: http://geospatial-service:8084
+      AUTH_SERVICE_URL: http://auth-service:8081
+      AUTH_SERVICE_URI: http://auth-service:8081
+      TRIP_SERVICE_URI: http://trip-service:8082
+      DRIVER_SERVICE_URI: http://driver-service:8083
+      GEO_SERVICE_URI: http://geospatial-service:8084
+      BILLING_SERVICE_URI: http://billing-service:8086
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+      BILLING_AUTO_CHARGE: 'false'
+      JAVA_TOOL_OPTIONS: -XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-true}
+      SERVER_PORT: '8085'
+      OTLP_ENDPOINT: http://tempo:4318/v1/traces
+      LOG_LEVEL_KAFKA: INFO
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget -q --spider http://localhost:8085/actuator/health || exit 1
+      interval: 10s
+      timeout: 5s
+      start_period: 120s
+      retries: 18
+    container_name: taasim-matching
+    ports:
+    - 8085:8085
+  billing-service:
+    build:
+      context: ./backend
+      dockerfile: billing-service/Dockerfile
+    image: taasim/billing-service:local
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: taasim
+      POSTGRES_USER: taasim
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-taasim}
+      CASSANDRA_HOST: cassandra
+      CASSANDRA_PORT: '9042'
+      CASSANDRA_DC: datacenter1
+      CASSANDRA_KEYSPACE: taasim
+      KAFKA_BOOTSTRAP: kafka:29092
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      GEOSPATIAL_SERVICE_URL: http://geospatial-service:8084
+      AUTH_SERVICE_URL: http://auth-service:8081
+      AUTH_SERVICE_URI: http://auth-service:8081
+      TRIP_SERVICE_URI: http://trip-service:8082
+      DRIVER_SERVICE_URI: http://driver-service:8083
+      GEO_SERVICE_URI: http://geospatial-service:8084
+      BILLING_SERVICE_URI: http://billing-service:8086
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+      BILLING_AUTO_CHARGE: 'false'
+      JAVA_TOOL_OPTIONS: -XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-true}
+      SERVER_PORT: '8086'
+      OTLP_ENDPOINT: http://tempo:4318/v1/traces
+      LOG_LEVEL_KAFKA: INFO
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: 'true'
+      SPRING_FLYWAY_BASELINE_VERSION: '0'
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget -q --spider http://localhost:8086/actuator/health || exit 1
+      interval: 10s
+      timeout: 5s
+      start_period: 120s
+      retries: 18
+    container_name: taasim-billing
+    ports:
+    - 8086:8086
+  gateway-service:
+    build:
+      context: ./backend
+      dockerfile: gateway-service/Dockerfile
+    image: taasim/gateway-service:local
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: taasim
+      POSTGRES_USER: taasim
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-taasim}
+      CASSANDRA_HOST: cassandra
+      CASSANDRA_PORT: '9042'
+      CASSANDRA_DC: datacenter1
+      CASSANDRA_KEYSPACE: taasim
+      KAFKA_BOOTSTRAP: kafka:29092
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      GEOSPATIAL_SERVICE_URL: http://geospatial-service:8084
+      AUTH_SERVICE_URL: http://auth-service:8081
+      AUTH_SERVICE_URI: http://auth-service:8081
+      TRIP_SERVICE_URI: http://trip-service:8082
+      DRIVER_SERVICE_URI: http://driver-service:8083
+      GEO_SERVICE_URI: http://geospatial-service:8084
+      BILLING_SERVICE_URI: http://billing-service:8086
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+      BILLING_AUTO_CHARGE: 'false'
+      JAVA_TOOL_OPTIONS: -XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-true}
+      SERVER_PORT: '8080'
+      OTLP_ENDPOINT: http://tempo:4318/v1/traces
+      LOG_LEVEL_KAFKA: INFO
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    ports:
+    - 8080:8080
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget -q --spider http://localhost:8080/actuator/health || exit 1
+      interval: 10s
+      timeout: 5s
+      start_period: 120s
+      retries: 18
+    container_name: taasim-gateway
+  client-app:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        APP: client-app
+        VITE_API_BASE: ${PUBLIC_API_BASE:-http://localhost:8080}
+        VITE_WS_BASE: ${PUBLIC_WS_BASE:-http://localhost:8080/ws/tracking}
+        VITE_STRIPE_PK: ${VITE_STRIPE_PK:-}
+    ports:
+    - 5173:80
+    container_name: taasim-client-app
+    depends_on:
+      gateway-service:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget -q --spider http://127.0.0.1/ || exit 1
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 12
+  driver-app:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        APP: driver-app
+        VITE_API_BASE: ${PUBLIC_API_BASE:-http://localhost:8080}
+        VITE_WS_BASE: ${PUBLIC_WS_BASE:-http://localhost:8080/ws/tracking}
+        VITE_STRIPE_PK: ${VITE_STRIPE_PK:-}
+    ports:
+    - 5174:80
+    container_name: taasim-driver-app
+    depends_on:
+      gateway-service:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget -q --spider http://127.0.0.1/ || exit 1
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 12
+  admin-app:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        APP: admin-app
+        VITE_API_BASE: ${PUBLIC_API_BASE:-http://localhost:8080}
+        VITE_WS_BASE: ${PUBLIC_WS_BASE:-http://localhost:8080/ws/tracking}
+        VITE_STRIPE_PK: ${VITE_STRIPE_PK:-}
+    ports:
+    - 5175:80
+    container_name: taasim-admin-app
+    depends_on:
+      gateway-service:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget -q --spider http://127.0.0.1/ || exit 1
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 12
+  flink-taskmanager:
+    profiles:
+    - analytics
+  spark-worker:
+    profiles:
+    - analytics
+  jupyter:
+    profiles:
+    - analytics
+  flink-jobmanager:
+    profiles: [analytics]
+    ports: !override ["18081:8081"]
+  spark-master:
+    profiles: [analytics]
+    ports: !override ["18080:8080", "7077:7077"]
+  kafka-archiver:
+    depends_on:
+      kafka:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully

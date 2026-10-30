@@ -1,4 +1,4 @@
-param([switch]$SkipBuild)
+param([switch]$SkipBuild, [switch]$Analytics)
 $ErrorActionPreference = 'Stop'
 Push-Location (Split-Path $PSScriptRoot -Parent)
 try {
@@ -6,7 +6,9 @@ try {
         Push-Location backend
         try { mvn -B package -DskipTests; if ($LASTEXITCODE) { throw 'Backend build failed' } } finally { Pop-Location }
     }
-    docker compose -f docker-compose.demo.yml --profile ui up -d --build --wait --wait-timeout 360
+    $composeArgs = @('compose', '-f', 'docker-compose.yml', '-f', 'docker-compose.app.yml')
+    if ($Analytics) { $composeArgs += @('--profile', 'analytics') }
+    & docker @composeArgs up -d --build --wait --wait-timeout 600
     if ($LASTEXITCODE) { throw 'Docker startup failed' }
     node scripts/wait_for_stack.mjs
     if ($LASTEXITCODE) { throw 'Stack readiness failed' }

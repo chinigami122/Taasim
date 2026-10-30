@@ -78,6 +78,8 @@ class TripSecurityTest {
 
         Trip trip = new Trip();
         trip.setTripId("trip-abc-123");
+        trip.setRiderId("client-1");
+        trip.setTaxiId("driver-1");
         trip.setStatus("REQUESTED");
         trip.setOriginZone(5);
         trip.setDestZone(12);
@@ -103,6 +105,8 @@ class TripSecurityTest {
 
         Trip trip = new Trip();
         trip.setTripId("trip-abc-123");
+        trip.setRiderId("client-1");
+        trip.setTaxiId("driver-1");
         trip.setStatus("REQUESTED");
         trip.setOriginZone(5);
         trip.setDestZone(12);
@@ -120,6 +124,8 @@ class TripSecurityTest {
 
         Trip trip = new Trip();
         trip.setTripId("trip-abc-123");
+        trip.setRiderId("client-1");
+        trip.setTaxiId("driver-1");
         trip.setStatus("REQUESTED");
         trip.setOriginZone(5);
         trip.setDestZone(12);
@@ -129,6 +135,16 @@ class TripSecurityTest {
         mockMvc.perform(get("/api/trips/trip-abc-123")
                         .header("Authorization", "Bearer " + clientToken))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void getTrip_otherClient_returns403() throws Exception {
+        Trip trip = new Trip();
+        trip.setTripId("private-trip"); trip.setRiderId("client-2"); trip.setTaxiId("driver-2");
+        when(tripService.getTripById("private-trip")).thenReturn(trip);
+        mockMvc.perform(get("/api/trips/private-trip")
+            .header("Authorization", "Bearer " + generateToken("client-1", "CLIENT")))
+            .andExpect(status().isForbidden());
     }
 
     @Test

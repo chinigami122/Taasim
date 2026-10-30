@@ -77,12 +77,11 @@ public class BillingController {
 
         return repository.findByTripId(tripId)
                 .map(r -> {
-                    // Authorization: only the client or the driver of this trip, or an admin
-                    if (userRole != null && !"ADMIN".equalsIgnoreCase(userRole) && userId != null) {
-                        if (!userId.equals(r.getClientId()) && !userId.equals(r.getDriverId())) {
-                            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                                    .body(Map.of("error", "Not your trip"));
-                        }
+                    var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                    boolean admin = authentication.getAuthorities().stream().anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+                    String callerId = authentication.getName();
+                    if (!admin && !callerId.equals(r.getClientId()) && !callerId.equals(r.getDriverId())) {
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Not your trip"));
                     }
                     return ResponseEntity.ok(toDetailDto(r));
                 })
@@ -91,14 +90,14 @@ public class BillingController {
 
     @Operation(summary = "Get billing history for a Driver")
     @GetMapping("/drivers/{driverId}")
-    @PreAuthorize("hasAnyRole('DRIVER', 'ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('DRIVER') and #driverId == authentication.name)")
     public ResponseEntity<List<BillingRecord>> getDriverBilling(@PathVariable String driverId) {
         return ResponseEntity.ok(repository.findByDriverIdOrderByCreatedAtDesc(driverId));
     }
 
     @Operation(summary = "Get billing history for a Client")
     @GetMapping("/clients/{clientId}")
-    @PreAuthorize("hasAnyRole('CLIENT', 'ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('CLIENT') and #clientId == authentication.name)")
     public ResponseEntity<List<BillingRecord>> getClientBilling(@PathVariable String clientId) {
         return ResponseEntity.ok(repository.findByClientIdOrderByCreatedAtDesc(clientId));
     }
