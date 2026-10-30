@@ -84,6 +84,19 @@ docker run --rm --network host -v "${PWD}/tests/load:/scripts:ro" grafana/k6:1.3
 
 GitHub Actions runs backend tests/container builds, all three frontend builds, and an isolated end-to-end workflow with the full 20-user k6 scenario. Logs are retained as workflow artifacts. The existing auth integration test now runs in Maven's `verify` phase through Failsafe.
 
+### Measured CI load result — October 30, 2026
+
+The full 20-user scenario passed on GitHub's Ubuntu runner (revision `13ad111`):
+
+| Metric | Measured | Threshold |
+| --- | --- | --- |
+| Trip request p95 | 14.33 ms | <800 ms |
+| Trip status p95 | 8.48 ms | <200 ms |
+| HTTP failure rate | 0% | <1% |
+| Checks passed | 1,822 / 1,822 | >99% |
+
+The run includes a 30-second ramp, one minute at 20 users, and a 30-second ramp-down. These are CI measurements for request/status APIs; they do not measure card settlement or guarantee laptop/VPS performance. The workflow retains its JSON summary and container logs.
+
 ## Deployment is deferred
 
 No deployment is performed by this change. `deploy-on-tag.yml` is guarded by `DEPLOY_ENABLED=true` and a production environment; it stays skipped by default. Before enabling it, configure SSH credentials, a verified SSH host key, `.env`, public frontend API/WebSocket build URLs, image availability, a domain and HTTPS. `deploy/deploy.sh` combines the demo infrastructure compose with the complete GHCR image overlay, without deleting data volumes.

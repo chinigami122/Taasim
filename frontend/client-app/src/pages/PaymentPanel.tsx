@@ -9,7 +9,7 @@ const stripePromise = isRealStripeKey ? loadStripe(stripePk) : null;
 
 interface InnerFormProps {
   tripId: string;
-  amountMinor?: number;
+  amountMinor: number;
   onPaymentSuccess?: () => void;
 }
 
@@ -82,14 +82,14 @@ function StripeRealForm({ tripId, amountMinor, onPaymentSuccess }: InnerFormProp
 interface PaymentPanelProps {
   tripId: string;
   clientSecret: string;
-  amountMinor?: number;
+  amountMinor: number;
   onPaymentSuccess?: () => void;
 }
 
 export default function PaymentPanel({
   tripId,
   clientSecret,
-  amountMinor = 2500,
+  amountMinor,
   onPaymentSuccess,
 }: PaymentPanelProps) {
   const useRealElements = isRealStripeKey && clientSecret && !clientSecret.startsWith('pi_mock_');

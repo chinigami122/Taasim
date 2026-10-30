@@ -70,7 +70,7 @@ const driverIcon = L.divIcon({
     box-shadow: 0 0 20px rgba(245, 158, 11, 0.8);
     border: 2px solid #ffffff;
     animation: pulse 1.8s infinite;
-  ">ðŸš•</div>`,
+  ">🚕</div>`,
   iconSize: [36, 36],
   iconAnchor: [18, 18],
 });
@@ -101,7 +101,7 @@ export default function RideMapPage() {
 
   // Stripe Payment State
   const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [fareAmount, setFareAmount] = useState<number>(2500);
+  const [fareAmount, setFareAmount] = useState<number | null>(null);
 
   const unsubRef = useRef<(() => void) | null>(null);
 
@@ -124,9 +124,17 @@ export default function RideMapPage() {
   }, []);
 
   const fetchPaymentIntent = async (tId: string) => {
+    setErrorMsg(null);
     try {
       const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
       const token = localStorage.getItem('token');
+      const fareResponse = await fetch(`${apiBase}/api/billing/trips/${tId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!fareResponse.ok) throw new Error('Your fare is being calculated. Please wait.');
+      const fare = await fareResponse.json();
+      setFareAmount(Math.round(Number(fare.totalFare) * 100));
+      if (fare.status === 'CHARGED') { setStatus('PAID'); return; }
       const res = await fetch(`${apiBase}/api/billing/trips/${tId}/intent`, {
         method: 'POST',
         headers: {
@@ -142,6 +150,12 @@ export default function RideMapPage() {
       setErrorMsg(err instanceof Error ? err.message : 'Checkout unavailable');
     }
   };
+
+  useEffect(() => {
+    if (status !== 'COMPLETED' || !tripId || fareAmount !== null) return;
+    const timer = setInterval(() => { void fetchPaymentIntent(tripId); }, 2500);
+    return () => clearInterval(timer);
+  }, [status, tripId, fareAmount]);
 
   // Poll trip status if in REQUESTED/MATCHED/IN_PROGRESS to track completion
   useEffect(() => {
@@ -188,6 +202,7 @@ export default function RideMapPage() {
     setDriverSpeed(null);
     setLastPingTime(null);
     setClientSecret(null);
+    setFareAmount(null);
     setErrorMsg(null);
   };
 
@@ -484,7 +499,7 @@ export default function RideMapPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Trip ID</span>
               <span style={{ fontSize: '0.82rem', fontFamily: 'monospace', color: '#6366f1', fontWeight: 600 }}>
-                {tripId.slice(0, 13)}â€¦
+                {tripId.slice(0, 13)}…
               </span>
             </div>
 
@@ -513,7 +528,7 @@ export default function RideMapPage() {
                 <Radio size={14} className="animate-pulse" />
                 <span>
                   Live GPS: {driverPos[0].toFixed(4)}, {driverPos[1].toFixed(4)}
-                  {driverSpeed !== null ? ` â€¢ ${(driverSpeed * 3.6).toFixed(1)} km/h` : ''}
+                  {driverSpeed !== null ? ` • ${(driverSpeed * 3.6).toFixed(1)} km/h` : ''}
                   {lastPingTime ? ` (${lastPingTime})` : ''}
                 </span>
               </div>
@@ -526,14 +541,14 @@ export default function RideMapPage() {
         {/* Step 5 Payment Panel when Trip is COMPLETED */}
         {status === 'COMPLETED' && (
           <div style={{ marginTop: '8px' }}>
-            <><button className="btn btn-secondary" onClick={() => fetchPaymentIntent(tripId!)}>Refresh fare / retry checkout</button><PaymentPanel
+            <><button className="btn btn-secondary" onClick={() => fetchPaymentIntent(tripId!)}>Refresh fare / retry checkout</button>{fareAmount === null ? <p role="status">Calculating your fare…</p> : <PaymentPanel
               tripId={tripId || ''}
               clientSecret={clientSecret || ''}
               amountMinor={fareAmount}
               onPaymentSuccess={() => {
                 setStatus('PAID');
               }}
-            /></>
+            />}</>
           </div>
         )}
       </div>
@@ -601,7 +616,7 @@ export default function RideMapPage() {
         {driverPos && (
           <Marker position={driverPos} icon={driverIcon}>
             <Popup>
-              <strong>ðŸš• {driverId || 'Assigned Driver'}</strong>
+              <strong>🚕 {driverId || 'Assigned Driver'}</strong>
               <br />
               Speed: {driverSpeed !== null ? `${(driverSpeed * 3.6).toFixed(1)} km/h` : 'N/A'}
               <br />
