@@ -35,6 +35,30 @@ async function account(role, index = "") {
       .sub,
   };
 }
+async function liveSubscription(token, destination) {
+  const socket = new WebSocket(base.replace(/^http/, "ws") + "/ws/tracking");
+  const messages = [];
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { socket.close(); reject(new Error("STOMP subscription timeout")); }, 15000);
+    socket.onerror = () => { clearTimeout(timer); reject(new Error("WebSocket connection failed")); };
+    socket.onopen = () => socket.send(`CONNECT\naccept-version:1.2\nAuthorization:Bearer ${token}\nheart-beat:0,0\n\n\0`);
+    socket.onmessage = event => {
+      const frame = String(event.data).trimStart();
+      if (frame.startsWith("CONNECTED")) {
+        socket.send(`SUBSCRIBE\nid:smoke\ndestination:${destination}\n\n\0`);
+        // Spring's simple broker does not implement STOMP receipts.
+        clearTimeout(timer); setTimeout(resolve, 150);
+      }
+      if (frame.startsWith("ERROR")) { clearTimeout(timer); reject(new Error("STOMP rejected subscription")); }
+      if (frame.startsWith("MESSAGE")) {
+        const payload = frame.slice(frame.indexOf("\n\n") + 2).replace(/\0$/, "");
+        messages.push(JSON.parse(payload));
+      }
+    };
+  });
+  return {messages, close: () => socket.close()};
+}
+
 async function until(fn, predicate, label) {
   let last;
   for (let i = 0; i < 60; i++) {
@@ -58,6 +82,7 @@ await request("/api/drivers/location", driver.token, {
   lon: -7.5898,
   speed: 0,
 });
+const offers = await liveSubscription(driver.token, `/topic/drivers/${driver.id}/offers`);
 const trip = await request("/api/trips/request", client.token, {
   originLat: 33.5731,
   originLon: -7.5898,
@@ -69,6 +94,8 @@ await until(
   (s) => s.pendingTrip === trip.tripId,
   "driver offer",
 );
+await until(async () => offers.messages, items => items.some(item => item.tripId === trip.tripId), "live STOMP offer");
+const tracking = await liveSubscription(client.token, `/topic/trips/${trip.tripId}/location`);
 await request(
   `/api/drivers/trips/${driver.id}/accept`,
   driver.token,
@@ -91,6 +118,8 @@ await request("/api/drivers/location", driver.token, {
   lon: -7.5898,
   speed: 5,
 });
+await until(async () => tracking.messages, items => items.some(item => item.driverId === driver.id && item.lat === 33.5831), "live driver tracking");
+offers.close(); tracking.close();
 await request(
   `/api/drivers/trips/${driver.id}/complete`,
   driver.token,

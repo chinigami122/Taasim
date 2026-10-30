@@ -145,7 +145,7 @@ export default function RideMapPage() {
 
   // Poll trip status if in REQUESTED/MATCHED/IN_PROGRESS to track completion
   useEffect(() => {
-    if (!tripId || status === 'COMPLETED' || status === 'CANCELLED') return;
+    if (!tripId || status === 'COMPLETED' || status === 'CANCELLED' || status === 'REJECTED' || status === 'PAID') return;
 
     const interval = setInterval(async () => {
       try {
@@ -249,12 +249,18 @@ export default function RideMapPage() {
         return { label: 'Matching Taxi...', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' };
       case 'MATCHED':
         return { label: 'Taxi Matched', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' };
+      case 'ACCEPTED':
       case 'DRIVER_ARRIVING':
         return { label: 'Driver Arriving', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.15)' };
       case 'IN_PROGRESS':
         return { label: 'Ride in Progress', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.15)' };
       case 'COMPLETED':
         return { label: 'Trip Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.2)' };
+      case 'PAID':
+        return { label: 'Payment Confirmed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.2)' };
+      case 'REJECTED':
+      case 'CANCELLED':
+        return { label: 'Ride ' + status.toLowerCase(), color: '#f43f5e', bg: 'rgba(244, 63, 94, 0.1)' };
       default:
         return { label: 'Select Pick & Drop', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.1)' };
     }
