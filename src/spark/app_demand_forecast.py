@@ -170,7 +170,6 @@ def train(spark, counts, cutoff):
 
 
 def publish(spark, counts, cutoff):
-    from pyspark.ml import PipelineModel
     from pyspark.sql import functions as F
 
     target = cutoff + 1
@@ -194,6 +193,8 @@ def publish(spark, counts, cutoff):
         (F.col("city") == CITY) & (F.col("trained_through") <= instant(cutoff))
     ).orderBy(F.col("trained_through").desc()).first()
     if active and active.version != BASELINE_VERSION and len(features) == len(ZONES):
+        from pyspark.ml import PipelineModel
+
         model = PipelineModel.load(f"{MODEL_ROOT}/{active.version}/model")
         predictions = {
             row.zone: max(0.0, row.prediction) if math.isfinite(row.prediction) else row.prediction

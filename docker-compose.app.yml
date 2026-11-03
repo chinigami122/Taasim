@@ -550,11 +550,18 @@ services:
   demand-forecast:
     extends:
       service: ride-request-kpis
+    image: taasim/demand-forecast:local
+    build:
+      context: ./src/spark
+      dockerfile: Dockerfile.forecast
     environment:
       TAASIM_SPARK_JOB: app_demand_forecast.py
     command: ["forecast"]
   ride-request-kpi-scheduler:
-    image: apache/spark:3.5.3-python3
+    image: taasim/demand-forecast:local
+    build:
+      context: ./src/spark
+      dockerfile: Dockerfile.forecast
     profiles: [analytics]
     volumes:
     - ./src/spark:/jobs:ro

@@ -43,7 +43,7 @@ jobs:
       - name: Verify forecasts stay unavailable with sparse app history
         run: |
           set -o pipefail
-          docker compose -f docker-compose.yml -f docker-compose.app.yml run --rm --no-deps demand-forecast | tee forecast-smoke.log
+          docker compose -f docker-compose.yml -f docker-compose.app.yml run --build --rm --no-deps demand-forecast | tee forecast-smoke.log
           grep -F 'insufficient app history' forecast-smoke.log
       - name: Verify forecast evaluation and publication with synthetic history
         run: >-
