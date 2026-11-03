@@ -24,7 +24,11 @@ jobs:
       - name: Package services
         run: mvn -B -f backend/pom.xml package -DskipTests
       - name: Start original TaaSim stack with app overlay
-        run: docker compose -f docker-compose.yml -f docker-compose.app.yml up -d --build --wait --wait-timeout 600 client-app driver-app admin-app matching-service billing-service
+        run: >-
+          docker compose -f docker-compose.yml -f docker-compose.app.yml up
+          -d --build --wait --wait-timeout 600
+          client-app driver-app admin-app
+          auth-service trip-service driver-service geospatial-service matching-service billing-service
       - name: Wait for gateway
         run: node scripts/wait_for_stack.mjs
       - name: Exercise real ride lifecycle
