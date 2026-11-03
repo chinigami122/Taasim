@@ -1,4 +1,5 @@
 import { useState } from "react";
+import RideRequests from "./RideRequests";
 import {
   ResponsiveContainer,
   LineChart,
@@ -131,7 +132,7 @@ function Dashboard() {
         </div>
       </div>
       <nav className="tabs" aria-label="Admin workspace">
-        {["fleet", "trips", "billing"].map((t) => (
+        {["fleet", "trips", "billing", "analytics"].map((t) => (
           <button
             className={tab === t ? "active" : ""}
             key={t}
@@ -300,6 +301,7 @@ function Dashboard() {
           )}
         </section>
       )}
+      {tab === "analytics" && <RideRequests />}
       {tab === "billing" && (
         <>
           <div className="grid">

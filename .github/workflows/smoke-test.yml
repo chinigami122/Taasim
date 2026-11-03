@@ -29,8 +29,11 @@ jobs:
           -d --build --wait --wait-timeout 600
           client-app driver-app admin-app
           auth-service trip-service driver-service geospatial-service matching-service billing-service
+          kafka-archiver
       - name: Wait for gateway
         run: node scripts/wait_for_stack.mjs
+      - name: Verify the ride request analytics pipeline
+        run: node scripts/test_ride_request_kpis.mjs
       - name: Exercise real ride lifecycle
         run: node scripts/test_all_apps.mjs
       - name: k6 request/status load (20 virtual users)

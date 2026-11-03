@@ -22,11 +22,10 @@ INPUT_PATH_PORTO = "s3a://curated/porto-trips/"
 INPUT_PATH_NYC = "s3a://raw/nyc-tlc/"
 
 # --- Spark Session ---
-def get_spark_session():
+def get_spark_session(packages=SPARK_PACKAGES):
     """Initializes a Spark session for MinIO and Cassandra."""
-    return SparkSession.builder \
+    builder = SparkSession.builder \
         .appName("KPIAnalytics") \
-        .config("spark.jars.packages", SPARK_PACKAGES) \
         .config("spark.hadoop.fs.s3a.endpoint", MINIO_ENDPOINT) \
         .config("spark.hadoop.fs.s3a.access.key", MINIO_ACCESS_KEY) \
         .config("spark.hadoop.fs.s3a.secret.key", MINIO_SECRET_KEY) \
@@ -34,8 +33,10 @@ def get_spark_session():
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
         .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false") \
         .config("spark.sql.shuffle.partitions", "20") \
-        .config("spark.cassandra.connection.host", CASSANDRA_HOST) \
-        .getOrCreate()
+        .config("spark.cassandra.connection.host", CASSANDRA_HOST)
+    if packages:
+        builder.config("spark.jars.packages", packages)
+    return builder.getOrCreate()
 
 # --- Main Analytics Logic ---
 def calculate_and_save_kpis(spark):

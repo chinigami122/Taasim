@@ -35,6 +35,16 @@ docker compose -f docker-compose.yml -f docker-compose.app.yml up -d --build
 
 The normal app stack includes observability, MinIO and the archiver. Add `-Analytics` to the launcher (or `--profile analytics` to Compose) for Flink, Spark and Jupyter in the same project. Their dashboards move to **18081** (Flink) and **18080** (Spark), leaving 8080/8081 for gateway/auth. Analytics requires additional memory. The old `docker-compose.demo.yml` remains an optional isolated configuration and is not used by this launcher.
 
+The analytics profile also refreshes hourly ride-request counts for the last 48 completed hours. In the Admin App, open **Analytics** to see counts by pickup zone in Casablanca time. The first Spark run downloads connector dependencies.
+
+For a manual run, stop `ride-request-kpi-scheduler` first to avoid overlapping writes. Use whole UTC hour boundaries for a backfill of up to 31 days.
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.app.yml run --rm ride-request-kpis --from 2026-10-30T00:00:00Z --to 2026-10-31T00:00:00Z
+```
+
+Run `node scripts/test_ride_request_kpis.mjs` against a disposable app stack with `kafka-archiver` running to exercise ingestion, Cassandra reads, role checks and replay handling. It creates synthetic requests.
+
 | App | Address | Demo login |
 | --- | --- | --- |
 | Passenger | http://localhost:5173 | client@taasim.demo |

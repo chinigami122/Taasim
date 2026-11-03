@@ -29,6 +29,11 @@ Thumbs.db
 Soufiane_plans/*
 venv/
 src/*
+!src/spark/
+src/spark/*
+!src/spark/etl_app_ride_requests.py
+!src/spark/run_ride_request_kpis.sh
+!src/spark/ivysettings.xml
 0_plans/*
 docs/*
 

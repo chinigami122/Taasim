@@ -68,7 +68,7 @@ spring:
         - id: admin-trip
           uri: ${TRIP_SERVICE_URI:http://localhost:8082}
           predicates:
-            - Path=/api/admin/trips, /api/admin/trips/**
+            - Path=/api/admin/trips, /api/admin/trips/**, /api/admin/analytics/ride-requests
           filters:
             - name: RequestRateLimiter
               args:
