@@ -1,4 +1,5 @@
 """Integration fixture for the disposable GitHub Actions Cassandra and MinIO."""
+import json
 import math
 import uuid
 from datetime import datetime, timezone
@@ -29,6 +30,16 @@ def main():
     try:
         forecast.publish(spark, {}, cutoff)
         assert not published()
+        snapshots = [
+            (forecast.CITY, forecast.instant(target), forecast.instant(target - 1),
+             forecast.FEATURE_VERSION,
+             json.dumps([row[1:-1] for row in forecast.feature_grid(counts, target, target + 1)]))
+            for target in range(cutoff - forecast.HISTORY + forecast.WEEK, cutoff)
+        ]
+        forecast.write(spark.createDataFrame(
+            snapshots,
+            "city string, target_hour timestamp, observed_at timestamp, feature_version string, features_json string",
+        ), "demand_forecast_features")
         forecast.train(spark, counts, cutoff)
         active = forecast.read(spark, "demand_forecast_model").where(
             F.col("city") == forecast.CITY

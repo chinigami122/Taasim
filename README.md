@@ -49,7 +49,7 @@ The hourly scheduler also publishes a forecast for the next UTC hour after refre
 
 Train separately with the following command. Training uses 42 days of app data, reserves the last seven days for testing, and promotes the GBT model only when it improves RMSE by at least 5% without increasing MAE. Both the training and holdout periods need at least 80% usable hours per zone. MinIO keeps versioned evaluations and model artifacts under `ml-store/models/app-demand`.
 
-The holdout uses earlier event hours for every prediction and freezes the exact inputs with the evaluation. Slice 26 can revise historical totals when late events arrive, so this is an event-time backtest on the current KPI history. Its metrics can differ from live scoring when arrivals are late.
+Training uses features captured by the hourly scheduler before each target hour, and joins them to the subsequently observed ride counts. Historical corrections can update labels without changing the earlier features. The GBT model becomes eligible after enough of these snapshots accumulate. Each evaluation keeps its exact feature and label data in MinIO.
 
 ```powershell
 docker compose -f docker-compose.yml -f docker-compose.app.yml run --rm demand-forecast train

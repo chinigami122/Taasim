@@ -130,6 +130,15 @@ CREATE TABLE IF NOT EXISTS taasim.demand_forecast_model (
     PRIMARY KEY (city, trained_through)
 ) WITH CLUSTERING ORDER BY (trained_through DESC);
 
+CREATE TABLE IF NOT EXISTS taasim.demand_forecast_features (
+    city text,
+    target_hour timestamp,
+    observed_at timestamp,
+    feature_version text,
+    features_json text,
+    PRIMARY KEY (city, target_hour)
+) WITH CLUSTERING ORDER BY (target_hour DESC);
+
 CREATE TABLE IF NOT EXISTS taasim.zone_demand_forecast (
     city text,
     target_hour timestamp,

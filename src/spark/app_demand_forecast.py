@@ -57,13 +57,12 @@ def feature_row(counts, target, zone):
     return (zone, time.hour, time.weekday(), float(day), float(week), sum(recent) / len(recent))
 
 
-def feature_grid(counts, start, end, labeled=False):
+def feature_grid(counts, start, end):
     for target in range(start, end):
         for zone in ZONES:
             features = feature_row(counts, target, zone)
-            demand = counts.get(target, {}).get(zone)
-            if features is not None and (not labeled or demand is not None):
-                yield (target, *features, float(demand) if labeled else None)
+            if features is not None:
+                yield (target, *features, None)
 
 
 def read(spark, table):
@@ -91,6 +90,15 @@ def seasonal_baseline(counts, target):
     return counts.get(target - WEEK) if coverage >= MIN_COVERAGE else None
 
 
+def labeled_snapshots(snapshots, counts, start, end):
+    for snapshot in snapshots:
+        target = hour_number(snapshot.target_hour)
+        if (start <= target < end and hour_number(snapshot.observed_at) == target - 1
+                and snapshot.feature_version == FEATURE_VERSION and target in counts):
+            for features in json.loads(snapshot.features_json):
+                yield (target, *features, float(counts[target][features[0]]))
+
+
 def train(spark, counts, cutoff):
     from pyspark.ml import Pipeline
     from pyspark.ml.feature import VectorAssembler
@@ -100,7 +108,12 @@ def train(spark, counts, cutoff):
 
     split = cutoff - WEEK
     start = cutoff - HISTORY + WEEK
-    rows = list(feature_grid(counts, start, cutoff, labeled=True))
+    snapshots = read(spark, "demand_forecast_features").where(
+        (F.col("city") == CITY)
+        & (F.col("target_hour") >= instant(start))
+        & (F.col("target_hour") < instant(cutoff))
+    ).collect()
+    rows = list(labeled_snapshots(snapshots, counts, start, cutoff))
     training = [row for row in rows if row[0] < split]
     holdout = [row for row in rows if row[0] >= split]
     coverage = {
@@ -112,7 +125,8 @@ def train(spark, counts, cutoff):
     }
     version = f"{instant(cutoff):%Y%m%dT%H}-{uuid.uuid4().hex}"
     report = {
-        "version": version, "source": "app_ride_requests_hourly", "features": FEATURE_VERSION,
+        "version": version, "source": "live_feature_snapshots_and_app_ride_requests_hourly",
+        "features": FEATURE_VERSION,
         "label_start": instant(start).isoformat(), "holdout_start": instant(split).isoformat(),
         "label_end": instant(cutoff).isoformat(), "coverage": coverage,
         "minimum_coverage": MIN_COVERAGE, "minimum_rmse_improvement": MIN_IMPROVEMENT,
@@ -168,10 +182,17 @@ def publish(spark, counts, cutoff):
     version = BASELINE_VERSION
     source = "seasonal_baseline"
     predictions = {zone: float(baseline[zone]) for zone in ZONES}
+    features = list(feature_grid(counts, target, target + 1))
+    observed_at = datetime.now(timezone.utc)
+    if len(features) == len(ZONES) and hour_number(observed_at) == cutoff:
+        write(spark.createDataFrame(
+            [(CITY, instant(target), observed_at, FEATURE_VERSION,
+              json.dumps([row[1:-1] for row in features]))],
+            "city string, target_hour timestamp, observed_at timestamp, feature_version string, features_json string",
+        ), "demand_forecast_features")
     active = read(spark, "demand_forecast_model").where(
         (F.col("city") == CITY) & (F.col("trained_through") <= instant(cutoff))
     ).orderBy(F.col("trained_through").desc()).first()
-    features = list(feature_grid(counts, target, target + 1))
     if active and active.version != BASELINE_VERSION and len(features) == len(ZONES):
         model = PipelineModel.load(f"{MODEL_ROOT}/{active.version}/model")
         predictions = {

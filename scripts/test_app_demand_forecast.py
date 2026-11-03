@@ -1,9 +1,11 @@
 import unittest
+import json
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from app_demand_forecast import (
-    DAY, WEEK, ZONES, feature_grid, feature_row, hour_number, observed_counts, seasonal_baseline,
+    DAY, WEEK, ZONES, FEATURE_VERSION, feature_row, hour_number, instant, labeled_snapshots,
+    observed_counts, seasonal_baseline,
 )
 
 
@@ -16,7 +18,14 @@ class ForecastFeaturesTest(unittest.TestCase):
         for hour in (target - 1, target, target + 1):
             counts[hour] = {1: 999}
         self.assertEqual(feature_row(counts, target, 1), expected)
-        self.assertEqual(next(feature_grid(counts, target, target + 1, labeled=True))[-1], 999)
+        snapshot = SimpleNamespace(
+            target_hour=instant(target), observed_at=instant(target - 1),
+            feature_version=FEATURE_VERSION, features_json=json.dumps([expected]),
+        )
+        self.assertEqual(list(labeled_snapshots([snapshot], counts, target, target + 1)),
+                         [(target, *expected, 999.0)])
+        snapshot.observed_at = instant(target)
+        self.assertEqual(list(labeled_snapshots([snapshot], counts, target, target + 1)), [])
 
     def test_zero_is_observed_but_missing_lag_is_unavailable(self):
         target = 500
