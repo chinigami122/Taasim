@@ -1,0 +1,71 @@
+name: smoke-test
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  full-flow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      TRACING_ENABLED: 'false'
+      COMPOSE_PARALLEL_LIMIT: '2'
+      MINIO_SERVER_IMAGE: taasim/minio-ci:slice26
+      MINIO_CLIENT_IMAGE: taasim/minio-ci:slice26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Package services
+        run: mvn -B -f backend/pom.xml package -DskipTests
+      - name: Build MinIO server and client from pinned upstream releases
+        run: docker build -f .github/docker/minio.Dockerfile -t "$MINIO_SERVER_IMAGE" .github/docker
+      - name: Start original TaaSim stack with app overlay
+        run: >-
+          docker compose -f docker-compose.yml -f docker-compose.app.yml up
+          -d --build --wait --wait-timeout 600
+          client-app driver-app admin-app
+          auth-service trip-service driver-service geospatial-service matching-service billing-service
+          kafka-archiver
+      - name: Wait for gateway
+        run: node scripts/wait_for_stack.mjs
+      - name: Verify the ride request analytics pipeline
+        run: node scripts/test_ride_request_kpis.mjs
+      - name: Verify point-in-time forecast features
+        run: PYTHONPATH=src/spark python3 scripts/test_app_demand_forecast.py
+      - name: Verify forecasts stay unavailable with sparse app history
+        run: |
+          set -o pipefail
+          docker compose -f docker-compose.yml -f docker-compose.app.yml run --build --rm --no-deps demand-forecast | tee forecast-smoke.log
+          grep -F 'insufficient app history' forecast-smoke.log
+      - name: Verify forecast evaluation and publication with synthetic history
+        run: >-
+          docker compose -f docker-compose.yml -f docker-compose.app.yml run --rm --no-deps
+          -e TAASIM_SPARK_JOB=test_app_demand_integration.py demand-forecast
+      - name: Exercise real ride lifecycle
+        run: node scripts/test_all_apps.mjs
+      - name: k6 request/status load (20 virtual users)
+        run: |
+          mkdir -p tests/load/results
+          chmod 777 tests/load/results
+          docker run --rm --network host -v "$PWD/tests/load:/scripts:ro" -v "$PWD/tests/load/results:/results" grafana/k6:1.3.0 run --summary-export=/results/summary.json /scripts/full_flow.js
+      - name: Collect logs
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.app.yml logs --no-color > smoke-logs.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-logs
+          path: |
+            smoke-logs.txt
+            tests/load/results/summary.json
+      - name: Stop stack
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.app.yml down

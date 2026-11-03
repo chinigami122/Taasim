@@ -157,6 +157,12 @@ public class MatchingEngine {
         });
     }
 
+    public boolean reserveDriver(String driverId, String tripId) {
+        var result = restClient.post().uri(builder -> builder.path("/internal/drivers/{driverId}/reserve")
+                .queryParam("tripId", tripId).build(driverId)).retrieve().body(Map.class);
+        return result != null && Boolean.TRUE.equals(result.get("reserved"));
+    }
+
     /**
      * Fallback method executed when the circuit is OPEN or retries are exhausted.
      */

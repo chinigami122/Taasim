@@ -56,6 +56,8 @@ class BillingServiceTest {
 
         billingService = new BillingService(repository, calculator, kafkaTemplate, stripeChargeService,
                 clientLookupService);
+        org.springframework.test.util.ReflectionTestUtils.setField(billingService, "autoCharge", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(billingService, "autoCharge", true);
     }
 
     @Test
@@ -151,6 +153,20 @@ class BillingServiceTest {
         assertThat(result.getChargeAttempts()).isEqualTo(1);
         assertThat(result.getLastChargeError()).isEqualTo("Card declined");
         assertThat(result.getLastAttemptedAt()).isNotNull();
+    }
+
+    @Test
+    void frontendCheckoutDoesNotAutoChargeOrRetry() {
+        org.springframework.test.util.ReflectionTestUtils.setField(billingService, "autoCharge", false);
+        when(repository.save(any(BillingRecord.class))).thenAnswer(invocation -> {
+            BillingRecord record = invocation.getArgument(0);
+            record.setId(UUID.randomUUID());
+            return record;
+        });
+        BillingRecord record = billingService.createBillingFor("checkout-trip", "driver", "client", 1, 2, 1);
+        billingService.retryCharge(record);
+        assertThat(record.getStatus()).isEqualTo("CALCULATED");
+        verifyNoInteractions(stripeChargeService, clientLookupService);
     }
 
     @Test

@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState<string | null>(() => localStorage.getItem('userId'));
 
   useEffect(() => {
-    OpenAPI.BASE = 'http://localhost:8080';
+    OpenAPI.BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
     OpenAPI.TOKEN = token ?? undefined;
   }, [token]);
 

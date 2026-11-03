@@ -29,54 +29,24 @@ public class BillingController {
         this.stripeChargeService = stripeChargeService;
     }
 
-    @Operation(summary = "Create Stripe PaymentIntent client secret for trip payment on frontend")
+    @Operation(summary = "Create an unconfirmed PaymentIntent for the authenticated client's completed trip")
     @PostMapping("/trips/{tripId}/intent")
-    @PreAuthorize("hasAnyRole('CLIENT', 'ADMIN')")
-    public ResponseEntity<?> createTripPaymentIntent(
-            @PathVariable String tripId,
-            @RequestHeader(value = "X-User-Id", required = false) String userId,
-            @RequestHeader(value = "X-User-Role", required = false) String userRole) {
-
-        return repository.findByTripId(tripId)
-                .map(record -> {
-                    if (userRole != null && !"ADMIN".equalsIgnoreCase(userRole) && userId != null) {
-                        if (!userId.equals(record.getClientId())) {
-                            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                                    .body(Map.of("error", "Not your trip"));
-                        }
-                    }
-
-                    long amountMinor = record.getTotalFare() != null
-                            ? record.getTotalFare().movePointRight(2).longValueExact()
-                            : 2500L;
-
-                    try {
-                        Map<String, Object> intent = stripeChargeService.createPaymentIntent(
-                                amountMinor,
-                                record.getCurrency() != null ? record.getCurrency() : "mad",
-                                tripId,
-                                "TaaSim trip fare " + tripId
-                        );
-                        return ResponseEntity.ok(intent);
-                    } catch (Exception e) {
-                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                .body(Map.of("error", "Stripe intent error: " + e.getMessage()));
-                    }
-                })
-                .orElseGet(() -> {
-                    try {
-                        Map<String, Object> intent = stripeChargeService.createPaymentIntent(
-                                2500L,
-                                "mad",
-                                tripId,
-                                "TaaSim estimated trip fare " + tripId
-                        );
-                        return ResponseEntity.ok(intent);
-                    } catch (Exception e) {
-                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                .body(Map.of("error", "Stripe intent error: " + e.getMessage()));
-                    }
-                });
+    @PreAuthorize("hasRole('CLIENT')")
+    public ResponseEntity<?> createTripPaymentIntent(@PathVariable String tripId, java.security.Principal principal) {
+        var found = repository.findByTripId(tripId);
+        if (found.isEmpty()) return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Fare is still being calculated. Please retry."));
+        var record = found.get();
+        if (!principal.getName().equals(record.getClientId())) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Not your trip"));
+        if ("CHARGED".equals(record.getStatus())) return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Trip already paid"));
+        if (!stripeChargeService.isConfigured()) return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("error", "Stripe checkout is not configured"));
+        try {
+            var intent = stripeChargeService.createPaymentIntent(record.getTotalFare().movePointRight(2).longValueExact(), record.getCurrency(), tripId, "TaaSim trip " + tripId);
+            record.setStripePaymentId(intent.get("paymentIntentId").toString());
+            repository.save(record);
+            return ResponseEntity.ok(intent);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", "Payment provider unavailable. Please retry."));
+        }
     }
 
     @Operation(summary = "Get paginated billing history for authenticated client")
@@ -107,12 +77,11 @@ public class BillingController {
 
         return repository.findByTripId(tripId)
                 .map(r -> {
-                    // Authorization: only the client or the driver of this trip, or an admin
-                    if (userRole != null && !"ADMIN".equalsIgnoreCase(userRole) && userId != null) {
-                        if (!userId.equals(r.getClientId()) && !userId.equals(r.getDriverId())) {
-                            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                                    .body(Map.of("error", "Not your trip"));
-                        }
+                    var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                    boolean admin = authentication.getAuthorities().stream().anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+                    String callerId = authentication.getName();
+                    if (!admin && !callerId.equals(r.getClientId()) && !callerId.equals(r.getDriverId())) {
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Not your trip"));
                     }
                     return ResponseEntity.ok(toDetailDto(r));
                 })
@@ -121,14 +90,14 @@ public class BillingController {
 
     @Operation(summary = "Get billing history for a Driver")
     @GetMapping("/drivers/{driverId}")
-    @PreAuthorize("hasAnyRole('DRIVER', 'ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('DRIVER') and #driverId == authentication.name)")
     public ResponseEntity<List<BillingRecord>> getDriverBilling(@PathVariable String driverId) {
         return ResponseEntity.ok(repository.findByDriverIdOrderByCreatedAtDesc(driverId));
     }
 
     @Operation(summary = "Get billing history for a Client")
     @GetMapping("/clients/{clientId}")
-    @PreAuthorize("hasAnyRole('CLIENT', 'ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('CLIENT') and #clientId == authentication.name)")
     public ResponseEntity<List<BillingRecord>> getClientBilling(@PathVariable String clientId) {
         return ResponseEntity.ok(repository.findByClientIdOrderByCreatedAtDesc(clientId));
     }

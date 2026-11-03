@@ -1,0 +1,13 @@
+{
+  "name": "taasim-frontends",
+  "private": true,
+  "workspaces": [
+    "client-app",
+    "driver-app",
+    "admin-app"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "lint": "npm run lint --workspaces"
+  }
+}

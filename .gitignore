@@ -29,6 +29,14 @@ Thumbs.db
 Soufiane_plans/*
 venv/
 src/*
+!src/spark/
+src/spark/*
+!src/spark/etl_app_ride_requests.py
+!src/spark/app_demand_forecast.py
+!src/spark/Dockerfile.forecast
+!src/spark/test_app_demand_integration.py
+!src/spark/run_ride_request_kpis.sh
+!src/spark/ivysettings.xml
 0_plans/*
 docs/*
 
@@ -62,3 +70,11 @@ yarn-error.log*
 pnpm-debug.log*
 **/.tsbuildinfo
 
+
+# Local validation output
+/backend-*.log
+/frontend-build.log
+/smoke-logs.txt
+/tests/load/results/
+
+/frontend-*.log

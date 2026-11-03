@@ -15,6 +15,8 @@ public class MatchEventConsumer {
 
     private final DriverService driverService;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.messaging.simp.SimpMessagingTemplate wsTemplate;
 
     public MatchEventConsumer(DriverService driverService) {
         this.driverService = driverService;
@@ -32,6 +34,8 @@ public class MatchEventConsumer {
                     : (json.has("client_id") ? json.get("client_id").asText() : "");
 
             driverService.assignTrip(driverId, tripId, etaSeconds);
+            if (wsTemplate != null) wsTemplate.convertAndSend("/topic/drivers/" + driverId + "/offers",
+                    java.util.Map.of("tripId", tripId, "etaSeconds", etaSeconds));
             if (!clientId.isBlank()) {
                 driverService.registerTripClient(tripId, clientId);
             }

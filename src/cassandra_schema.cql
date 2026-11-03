@@ -113,3 +113,38 @@ CREATE TABLE IF NOT EXISTS taasim.kpi_summary (
   PRIMARY KEY ((city, zone_id), window_start)
 ) WITH CLUSTERING ORDER BY (window_start DESC)
   AND default_time_to_live = 2592000;  -- 30 days (KPIs are semi-static)
+CREATE TABLE IF NOT EXISTS taasim.app_ride_requests_hourly (
+    city text,
+    day date,
+    hour timestamp,
+    zone int,
+    count bigint,
+    processed_at timestamp,
+    PRIMARY KEY ((city, day), hour, zone)
+);
+
+CREATE TABLE IF NOT EXISTS taasim.demand_forecast_model (
+    city text,
+    version text,
+    trained_through timestamp,
+    PRIMARY KEY (city, trained_through)
+) WITH CLUSTERING ORDER BY (trained_through DESC);
+
+CREATE TABLE IF NOT EXISTS taasim.demand_forecast_features (
+    city text,
+    target_hour timestamp,
+    observed_at timestamp,
+    feature_version text,
+    features_json text,
+    PRIMARY KEY (city, target_hour)
+) WITH CLUSTERING ORDER BY (target_hour DESC);
+
+CREATE TABLE IF NOT EXISTS taasim.zone_demand_forecast (
+    city text,
+    target_hour timestamp,
+    generated_at timestamp,
+    source text,
+    model_version text,
+    predicted_requests frozen<map<int, double>>,
+    PRIMARY KEY (city, target_hour)
+) WITH CLUSTERING ORDER BY (target_hour DESC);

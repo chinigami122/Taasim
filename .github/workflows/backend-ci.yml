@@ -43,7 +43,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: surefire-reports
-          path: backend/**/target/surefire-reports/
+          path: |
+            backend/**/target/surefire-reports/
+            backend/**/target/failsafe-reports/
 
       - name: Upload built JARs
         uses: actions/upload-artifact@v4

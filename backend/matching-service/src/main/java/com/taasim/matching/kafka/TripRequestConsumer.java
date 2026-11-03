@@ -40,7 +40,7 @@ public class TripRequestConsumer {
             // Find nearest driver prioritizing exact GPS coordinates with zone fallback
             Map<String, Object> match = matchingEngine.findNearestDriver(originLat, originLon, originZone);
 
-            if (match != null) {
+            if (match != null && matchingEngine.reserveDriver((String) match.get("driverId"), tripId)) {
                 matchEventProducer.send(
                         tripId,
                         (String) match.get("driverId"),

@@ -1,0 +1,585 @@
+{
+  "name": "taasim-demo",
+  "services": {
+    "kafka": {
+      "image": "apache/kafka:3.8.1",
+      "environment": {
+        "KAFKA_NODE_ID": 1,
+        "KAFKA_PROCESS_ROLES": "broker,controller",
+        "KAFKA_LISTENERS": "PLAINTEXT://:29092,CONTROLLER://:29093",
+        "KAFKA_ADVERTISED_LISTENERS": "PLAINTEXT://kafka:29092",
+        "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP": "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
+        "KAFKA_CONTROLLER_LISTENER_NAMES": "CONTROLLER",
+        "KAFKA_CONTROLLER_QUORUM_VOTERS": "1@kafka:29093",
+        "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR": 1,
+        "KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR": 1,
+        "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR": 1,
+        "KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS": 0,
+        "KAFKA_AUTO_CREATE_TOPICS_ENABLE": "true",
+        "KAFKA_HEAP_OPTS": "-Xms256m -Xmx384m"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list"
+        ],
+        "interval": "10s",
+        "timeout": "10s",
+        "retries": 30
+      }
+    },
+    "postgres": {
+      "image": "postgres:16-alpine",
+      "environment": {
+        "POSTGRES_USER": "taasim",
+        "POSTGRES_DB": "taasim",
+        "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:-taasim}"
+      },
+      "volumes": [
+        "demo_postgres:/var/lib/postgresql/data",
+        "./scripts/demo-postgres-init.sql:/docker-entrypoint-initdb.d/10-billing.sql:ro"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -U taasim"
+        ],
+        "interval": "5s",
+        "timeout": "5s",
+        "retries": 30
+      }
+    },
+    "redis": {
+      "image": "redis:7-alpine",
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "redis-cli",
+          "ping"
+        ],
+        "interval": "5s",
+        "timeout": "3s",
+        "retries": 30
+      }
+    },
+    "cassandra": {
+      "image": "cassandra:4.1",
+      "environment": {
+        "MAX_HEAP_SIZE": "512M",
+        "HEAP_NEWSIZE": "128M"
+      },
+      "volumes": [
+        "demo_cassandra:/var/lib/cassandra"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "cqlsh -e \"DESCRIBE KEYSPACES\""
+        ],
+        "interval": "15s",
+        "timeout": "10s",
+        "retries": 30,
+        "start_period": "45s"
+      }
+    },
+    "cassandra-init": {
+      "image": "cassandra:4.1",
+      "depends_on": {
+        "cassandra": {
+          "condition": "service_healthy"
+        }
+      },
+      "volumes": [
+        "./src/cassandra_schema.cql:/schema.cql:ro"
+      ],
+      "entrypoint": [
+        "cqlsh",
+        "cassandra",
+        "9042",
+        "-f",
+        "/schema.cql"
+      ]
+    },
+    "auth-service": {
+      "build": {
+        "context": "./backend",
+        "dockerfile": "auth-service/Dockerfile"
+      },
+      "image": "taasim/auth-service:local",
+      "environment": {
+        "JWT_SECRET": "${JWT_SECRET:-dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}",
+        "POSTGRES_HOST": "postgres",
+        "POSTGRES_PORT": "5432",
+        "POSTGRES_DB": "taasim",
+        "POSTGRES_USER": "taasim",
+        "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:-taasim}",
+        "CASSANDRA_HOST": "cassandra",
+        "CASSANDRA_PORT": "9042",
+        "CASSANDRA_DC": "datacenter1",
+        "CASSANDRA_KEYSPACE": "taasim",
+        "KAFKA_BOOTSTRAP": "kafka:29092",
+        "REDIS_HOST": "redis",
+        "REDIS_PORT": "6379",
+        "GEOSPATIAL_SERVICE_URL": "http://geospatial-service:8084",
+        "AUTH_SERVICE_URL": "http://auth-service:8081",
+        "AUTH_SERVICE_URI": "http://auth-service:8081",
+        "TRIP_SERVICE_URI": "http://trip-service:8082",
+        "DRIVER_SERVICE_URI": "http://driver-service:8083",
+        "GEO_SERVICE_URI": "http://geospatial-service:8084",
+        "BILLING_SERVICE_URI": "http://billing-service:8086",
+        "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}",
+        "STRIPE_WEBHOOK_SECRET": "${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}",
+        "BILLING_AUTO_CHARGE": "false",
+        "JAVA_TOOL_OPTIONS": "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC",
+        "MANAGEMENT_TRACING_ENABLED": "false",
+        "SERVER_PORT": "8081"
+      },
+      "depends_on": {
+        "kafka": {
+          "condition": "service_healthy"
+        },
+        "postgres": {
+          "condition": "service_healthy"
+        },
+        "redis": {
+          "condition": "service_healthy"
+        },
+        "cassandra-init": {
+          "condition": "service_completed_successfully"
+        }
+      },
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8081/actuator/health || exit 1"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "120s",
+        "retries": 18
+      }
+    },
+    "trip-service": {
+      "build": {
+        "context": "./backend",
+        "dockerfile": "trip-service/Dockerfile"
+      },
+      "image": "taasim/trip-service:local",
+      "environment": {
+        "JWT_SECRET": "${JWT_SECRET:-dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}",
+        "POSTGRES_HOST": "postgres",
+        "POSTGRES_PORT": "5432",
+        "POSTGRES_DB": "taasim",
+        "POSTGRES_USER": "taasim",
+        "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:-taasim}",
+        "CASSANDRA_HOST": "cassandra",
+        "CASSANDRA_PORT": "9042",
+        "CASSANDRA_DC": "datacenter1",
+        "CASSANDRA_KEYSPACE": "taasim",
+        "KAFKA_BOOTSTRAP": "kafka:29092",
+        "REDIS_HOST": "redis",
+        "REDIS_PORT": "6379",
+        "GEOSPATIAL_SERVICE_URL": "http://geospatial-service:8084",
+        "AUTH_SERVICE_URL": "http://auth-service:8081",
+        "AUTH_SERVICE_URI": "http://auth-service:8081",
+        "TRIP_SERVICE_URI": "http://trip-service:8082",
+        "DRIVER_SERVICE_URI": "http://driver-service:8083",
+        "GEO_SERVICE_URI": "http://geospatial-service:8084",
+        "BILLING_SERVICE_URI": "http://billing-service:8086",
+        "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}",
+        "STRIPE_WEBHOOK_SECRET": "${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}",
+        "BILLING_AUTO_CHARGE": "false",
+        "JAVA_TOOL_OPTIONS": "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC",
+        "MANAGEMENT_TRACING_ENABLED": "false",
+        "SERVER_PORT": "8082"
+      },
+      "depends_on": {
+        "kafka": {
+          "condition": "service_healthy"
+        },
+        "postgres": {
+          "condition": "service_healthy"
+        },
+        "redis": {
+          "condition": "service_healthy"
+        },
+        "cassandra-init": {
+          "condition": "service_completed_successfully"
+        }
+      },
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8082/actuator/health || exit 1"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "120s",
+        "retries": 18
+      }
+    },
+    "driver-service": {
+      "build": {
+        "context": "./backend",
+        "dockerfile": "driver-service/Dockerfile"
+      },
+      "image": "taasim/driver-service:local",
+      "environment": {
+        "JWT_SECRET": "${JWT_SECRET:-dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}",
+        "POSTGRES_HOST": "postgres",
+        "POSTGRES_PORT": "5432",
+        "POSTGRES_DB": "taasim",
+        "POSTGRES_USER": "taasim",
+        "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:-taasim}",
+        "CASSANDRA_HOST": "cassandra",
+        "CASSANDRA_PORT": "9042",
+        "CASSANDRA_DC": "datacenter1",
+        "CASSANDRA_KEYSPACE": "taasim",
+        "KAFKA_BOOTSTRAP": "kafka:29092",
+        "REDIS_HOST": "redis",
+        "REDIS_PORT": "6379",
+        "GEOSPATIAL_SERVICE_URL": "http://geospatial-service:8084",
+        "AUTH_SERVICE_URL": "http://auth-service:8081",
+        "AUTH_SERVICE_URI": "http://auth-service:8081",
+        "TRIP_SERVICE_URI": "http://trip-service:8082",
+        "DRIVER_SERVICE_URI": "http://driver-service:8083",
+        "GEO_SERVICE_URI": "http://geospatial-service:8084",
+        "BILLING_SERVICE_URI": "http://billing-service:8086",
+        "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}",
+        "STRIPE_WEBHOOK_SECRET": "${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}",
+        "BILLING_AUTO_CHARGE": "false",
+        "JAVA_TOOL_OPTIONS": "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC",
+        "MANAGEMENT_TRACING_ENABLED": "false",
+        "SERVER_PORT": "8083"
+      },
+      "depends_on": {
+        "kafka": {
+          "condition": "service_healthy"
+        },
+        "postgres": {
+          "condition": "service_healthy"
+        },
+        "redis": {
+          "condition": "service_healthy"
+        },
+        "cassandra-init": {
+          "condition": "service_completed_successfully"
+        }
+      },
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8083/actuator/health || exit 1"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "120s",
+        "retries": 18
+      }
+    },
+    "geospatial-service": {
+      "build": {
+        "context": "./backend",
+        "dockerfile": "geospatial-service/Dockerfile"
+      },
+      "image": "taasim/geospatial-service:local",
+      "environment": {
+        "JWT_SECRET": "${JWT_SECRET:-dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}",
+        "POSTGRES_HOST": "postgres",
+        "POSTGRES_PORT": "5432",
+        "POSTGRES_DB": "taasim",
+        "POSTGRES_USER": "taasim",
+        "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:-taasim}",
+        "CASSANDRA_HOST": "cassandra",
+        "CASSANDRA_PORT": "9042",
+        "CASSANDRA_DC": "datacenter1",
+        "CASSANDRA_KEYSPACE": "taasim",
+        "KAFKA_BOOTSTRAP": "kafka:29092",
+        "REDIS_HOST": "redis",
+        "REDIS_PORT": "6379",
+        "GEOSPATIAL_SERVICE_URL": "http://geospatial-service:8084",
+        "AUTH_SERVICE_URL": "http://auth-service:8081",
+        "AUTH_SERVICE_URI": "http://auth-service:8081",
+        "TRIP_SERVICE_URI": "http://trip-service:8082",
+        "DRIVER_SERVICE_URI": "http://driver-service:8083",
+        "GEO_SERVICE_URI": "http://geospatial-service:8084",
+        "BILLING_SERVICE_URI": "http://billing-service:8086",
+        "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}",
+        "STRIPE_WEBHOOK_SECRET": "${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}",
+        "BILLING_AUTO_CHARGE": "false",
+        "JAVA_TOOL_OPTIONS": "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC",
+        "MANAGEMENT_TRACING_ENABLED": "false",
+        "SERVER_PORT": "8084"
+      },
+      "depends_on": {
+        "kafka": {
+          "condition": "service_healthy"
+        },
+        "postgres": {
+          "condition": "service_healthy"
+        },
+        "redis": {
+          "condition": "service_healthy"
+        },
+        "cassandra-init": {
+          "condition": "service_completed_successfully"
+        }
+      },
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8084/actuator/health || exit 1"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "120s",
+        "retries": 18
+      }
+    },
+    "matching-service": {
+      "build": {
+        "context": "./backend",
+        "dockerfile": "matching-service/Dockerfile"
+      },
+      "image": "taasim/matching-service:local",
+      "environment": {
+        "JWT_SECRET": "${JWT_SECRET:-dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}",
+        "POSTGRES_HOST": "postgres",
+        "POSTGRES_PORT": "5432",
+        "POSTGRES_DB": "taasim",
+        "POSTGRES_USER": "taasim",
+        "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:-taasim}",
+        "CASSANDRA_HOST": "cassandra",
+        "CASSANDRA_PORT": "9042",
+        "CASSANDRA_DC": "datacenter1",
+        "CASSANDRA_KEYSPACE": "taasim",
+        "KAFKA_BOOTSTRAP": "kafka:29092",
+        "REDIS_HOST": "redis",
+        "REDIS_PORT": "6379",
+        "GEOSPATIAL_SERVICE_URL": "http://geospatial-service:8084",
+        "AUTH_SERVICE_URL": "http://auth-service:8081",
+        "AUTH_SERVICE_URI": "http://auth-service:8081",
+        "TRIP_SERVICE_URI": "http://trip-service:8082",
+        "DRIVER_SERVICE_URI": "http://driver-service:8083",
+        "GEO_SERVICE_URI": "http://geospatial-service:8084",
+        "BILLING_SERVICE_URI": "http://billing-service:8086",
+        "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}",
+        "STRIPE_WEBHOOK_SECRET": "${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}",
+        "BILLING_AUTO_CHARGE": "false",
+        "JAVA_TOOL_OPTIONS": "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC",
+        "MANAGEMENT_TRACING_ENABLED": "false",
+        "SERVER_PORT": "8085"
+      },
+      "depends_on": {
+        "kafka": {
+          "condition": "service_healthy"
+        },
+        "postgres": {
+          "condition": "service_healthy"
+        },
+        "redis": {
+          "condition": "service_healthy"
+        },
+        "cassandra-init": {
+          "condition": "service_completed_successfully"
+        }
+      },
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8085/actuator/health || exit 1"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "120s",
+        "retries": 18
+      }
+    },
+    "billing-service": {
+      "build": {
+        "context": "./backend",
+        "dockerfile": "billing-service/Dockerfile"
+      },
+      "image": "taasim/billing-service:local",
+      "environment": {
+        "JWT_SECRET": "${JWT_SECRET:-dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}",
+        "POSTGRES_HOST": "postgres",
+        "POSTGRES_PORT": "5432",
+        "POSTGRES_DB": "taasim_billing",
+        "POSTGRES_USER": "taasim",
+        "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:-taasim}",
+        "CASSANDRA_HOST": "cassandra",
+        "CASSANDRA_PORT": "9042",
+        "CASSANDRA_DC": "datacenter1",
+        "CASSANDRA_KEYSPACE": "taasim",
+        "KAFKA_BOOTSTRAP": "kafka:29092",
+        "REDIS_HOST": "redis",
+        "REDIS_PORT": "6379",
+        "GEOSPATIAL_SERVICE_URL": "http://geospatial-service:8084",
+        "AUTH_SERVICE_URL": "http://auth-service:8081",
+        "AUTH_SERVICE_URI": "http://auth-service:8081",
+        "TRIP_SERVICE_URI": "http://trip-service:8082",
+        "DRIVER_SERVICE_URI": "http://driver-service:8083",
+        "GEO_SERVICE_URI": "http://geospatial-service:8084",
+        "BILLING_SERVICE_URI": "http://billing-service:8086",
+        "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}",
+        "STRIPE_WEBHOOK_SECRET": "${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}",
+        "BILLING_AUTO_CHARGE": "false",
+        "JAVA_TOOL_OPTIONS": "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC",
+        "MANAGEMENT_TRACING_ENABLED": "false",
+        "SERVER_PORT": "8086"
+      },
+      "depends_on": {
+        "kafka": {
+          "condition": "service_healthy"
+        },
+        "postgres": {
+          "condition": "service_healthy"
+        },
+        "redis": {
+          "condition": "service_healthy"
+        },
+        "cassandra-init": {
+          "condition": "service_completed_successfully"
+        }
+      },
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8086/actuator/health || exit 1"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "120s",
+        "retries": 18
+      }
+    },
+    "gateway-service": {
+      "build": {
+        "context": "./backend",
+        "dockerfile": "gateway-service/Dockerfile"
+      },
+      "image": "taasim/gateway-service:local",
+      "environment": {
+        "JWT_SECRET": "${JWT_SECRET:-dev-only-secret-please-change-me-it-must-be-256-bits-long-abcd1234}",
+        "POSTGRES_HOST": "postgres",
+        "POSTGRES_PORT": "5432",
+        "POSTGRES_DB": "taasim",
+        "POSTGRES_USER": "taasim",
+        "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:-taasim}",
+        "CASSANDRA_HOST": "cassandra",
+        "CASSANDRA_PORT": "9042",
+        "CASSANDRA_DC": "datacenter1",
+        "CASSANDRA_KEYSPACE": "taasim",
+        "KAFKA_BOOTSTRAP": "kafka:29092",
+        "REDIS_HOST": "redis",
+        "REDIS_PORT": "6379",
+        "GEOSPATIAL_SERVICE_URL": "http://geospatial-service:8084",
+        "AUTH_SERVICE_URL": "http://auth-service:8081",
+        "AUTH_SERVICE_URI": "http://auth-service:8081",
+        "TRIP_SERVICE_URI": "http://trip-service:8082",
+        "DRIVER_SERVICE_URI": "http://driver-service:8083",
+        "GEO_SERVICE_URI": "http://geospatial-service:8084",
+        "BILLING_SERVICE_URI": "http://billing-service:8086",
+        "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY:-sk_test_placeholder_change_me}",
+        "STRIPE_WEBHOOK_SECRET": "${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}",
+        "BILLING_AUTO_CHARGE": "false",
+        "JAVA_TOOL_OPTIONS": "-XX:TieredStopAtLevel=1 -Xms64m -Xmx256m -XX:+UseSerialGC",
+        "MANAGEMENT_TRACING_ENABLED": "false",
+        "SERVER_PORT": "8080"
+      },
+      "depends_on": {
+        "kafka": {
+          "condition": "service_healthy"
+        },
+        "postgres": {
+          "condition": "service_healthy"
+        },
+        "redis": {
+          "condition": "service_healthy"
+        },
+        "cassandra-init": {
+          "condition": "service_completed_successfully"
+        }
+      },
+      "restart": "unless-stopped",
+      "ports": [
+        "${GATEWAY_PORT:-8080}:8080"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8080/actuator/health || exit 1"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "120s",
+        "retries": 18
+      }
+    },
+    "client-app": {
+      "profiles": [
+        "ui"
+      ],
+      "build": {
+        "context": "./frontend",
+        "dockerfile": "Dockerfile",
+        "args": {
+          "APP": "client-app",
+          "VITE_API_BASE": "${PUBLIC_API_BASE:-http://localhost:8080}",
+          "VITE_WS_BASE": "${PUBLIC_WS_BASE:-http://localhost:8080/ws/tracking}",
+          "VITE_STRIPE_PK": "${VITE_STRIPE_PK:-}"
+        }
+      },
+      "ports": [
+        "5173:80"
+      ]
+    },
+    "driver-app": {
+      "profiles": [
+        "ui"
+      ],
+      "build": {
+        "context": "./frontend",
+        "dockerfile": "Dockerfile",
+        "args": {
+          "APP": "driver-app",
+          "VITE_API_BASE": "${PUBLIC_API_BASE:-http://localhost:8080}",
+          "VITE_WS_BASE": "${PUBLIC_WS_BASE:-http://localhost:8080/ws/tracking}",
+          "VITE_STRIPE_PK": "${VITE_STRIPE_PK:-}"
+        }
+      },
+      "ports": [
+        "5174:80"
+      ]
+    },
+    "admin-app": {
+      "profiles": [
+        "ui"
+      ],
+      "build": {
+        "context": "./frontend",
+        "dockerfile": "Dockerfile",
+        "args": {
+          "APP": "admin-app",
+          "VITE_API_BASE": "${PUBLIC_API_BASE:-http://localhost:8080}",
+          "VITE_WS_BASE": "${PUBLIC_WS_BASE:-http://localhost:8080/ws/tracking}",
+          "VITE_STRIPE_PK": "${VITE_STRIPE_PK:-}"
+        }
+      },
+      "ports": [
+        "5175:80"
+      ]
+    }
+  },
+  "volumes": {
+    "demo_postgres": {},
+    "demo_cassandra": {}
+  }
+}

@@ -33,6 +33,19 @@ public class DriverController {
         this.driverService = driverService;
     }
 
+    @GetMapping("/me/state")
+    @PreAuthorize("hasRole('DRIVER')")
+    public Map<String, Object> state(java.security.Principal principal) {
+        return driverService.getDriverDetail(principal.getName());
+    }
+
+    @PutMapping("/me/availability")
+    @PreAuthorize("hasRole('DRIVER')")
+    public Map<String, Object> availability(java.security.Principal principal, @RequestParam boolean online) {
+        driverService.setOnline(principal.getName(), online);
+        return driverService.getDriverDetail(principal.getName());
+    }
+
     @Operation(summary = "Publish driver GPS ping", description = "Receives telemetry coordinates from a driver and writes them to Cassandra.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Position recorded"),
@@ -45,9 +58,7 @@ public class DriverController {
             @RequestBody GpsPingRequest request,
             @RequestHeader(value = "X-User-Id", required = false) String userId) {
 
-        if ((request.getDriverId() == null || request.getDriverId().isBlank()) && userId != null && !userId.isBlank()) {
-            request.setDriverId(userId);
-        }
+        request.setDriverId(org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName());
 
         VehiclePosition saved = locationService.processGpsPing(request);
 
@@ -66,7 +77,7 @@ public class DriverController {
         @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
         @ApiResponse(responseCode = "403", description = "Insufficient role (requires DRIVER)")
     })
-    @PreAuthorize("hasRole('DRIVER')")
+    @PreAuthorize("hasRole('DRIVER') and #driverId == authentication.name")
     @PutMapping("/trips/{driverId}/accept")
     public ResponseEntity<Map<String, Object>> acceptTrip(
             @Parameter(description = "Driver identifier", example = "taxi_001") @PathVariable String driverId) {
@@ -91,7 +102,7 @@ public class DriverController {
         @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
         @ApiResponse(responseCode = "403", description = "Insufficient role (requires DRIVER)")
     })
-    @PreAuthorize("hasRole('DRIVER')")
+    @PreAuthorize("hasRole('DRIVER') and #driverId == authentication.name")
     @PutMapping("/trips/{driverId}/reject")
     public ResponseEntity<Map<String, Object>> rejectTrip(
             @Parameter(description = "Driver identifier", example = "taxi_001") @PathVariable String driverId) {
@@ -112,7 +123,7 @@ public class DriverController {
         @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
         @ApiResponse(responseCode = "403", description = "Insufficient role (requires DRIVER)")
     })
-    @PreAuthorize("hasRole('DRIVER')")
+    @PreAuthorize("hasRole('DRIVER') and #driverId == authentication.name")
     @PutMapping("/trips/{driverId}/start")
     public ResponseEntity<Map<String, Object>> startRide(
             @Parameter(description = "Driver identifier", example = "taxi_001") @PathVariable String driverId) {
@@ -133,7 +144,7 @@ public class DriverController {
         @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
         @ApiResponse(responseCode = "403", description = "Insufficient role (requires DRIVER)")
     })
-    @PreAuthorize("hasRole('DRIVER')")
+    @PreAuthorize("hasRole('DRIVER') and #driverId == authentication.name")
     @PutMapping("/trips/{driverId}/complete")
     public ResponseEntity<Map<String, Object>> completeRide(
             @Parameter(description = "Driver identifier", example = "taxi_001") @PathVariable String driverId) {
@@ -178,4 +189,4 @@ public class DriverController {
 
         return ResponseEntity.ok(driverService.findTripsForDriver(effectiveDriverId, limit));
     }
-}
+}
