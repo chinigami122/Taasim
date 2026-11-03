@@ -51,7 +51,7 @@ services:
 
   # ── 2. MinIO (S3-compatible Object Storage) ───────────────────────────
   minio:
-    image: minio/minio:latest
+    image: ${MINIO_SERVER_IMAGE:-minio/minio:latest}
     container_name: taasim-minio
     command: server /data --console-address ":9001"
     ports:
@@ -65,19 +65,19 @@ services:
 
   # ── 2b. MinIO bucket initializer (runs once then exits) ───────────────
   minio-init:
-    image: minio/mc:latest
+    image: ${MINIO_CLIENT_IMAGE:-minio/mc:latest}
     container_name: taasim-minio-init
     depends_on:
       - minio
     entrypoint: >
       /bin/sh -c "
+      set -e;
       sleep 5;
       mc alias set local http://minio:9000 admin password;
       mc mb --ignore-existing local/raw;
       mc mb --ignore-existing local/curated;
       mc mb --ignore-existing local/ml-store;
       mc mb --ignore-existing local/kafka-archive;
-      exit 0;
       "
 
   # ── 3. Apache Cassandra ───────────────────────────────────────────────
