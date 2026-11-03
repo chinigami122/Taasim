@@ -45,6 +45,16 @@ docker compose -f docker-compose.yml -f docker-compose.app.yml run --rm ride-req
 
 Run `node scripts/test_ride_request_kpis.mjs` against a disposable app stack with `kafka-archiver` running to exercise ingestion, Cassandra reads, role checks and replay handling. It creates synthetic requests.
 
+The hourly scheduler also publishes a forecast for the next UTC hour after refreshing the ride counts. Forecasts cover the 16 Casablanca pickup zones. A weekly seasonal baseline needs 80% coverage of the preceding week and an observed value for the matching hour. With less history the job reports the forecast as unavailable. A published hour stays available with its generation time if a later attempt fails.
+
+Train separately with the following command. Training uses 42 days of app data, reserves the last seven days for testing, and promotes the GBT model only when it improves RMSE by at least 5% without increasing MAE. Both the training and holdout periods need at least 80% usable hours per zone. MinIO keeps versioned evaluations and model artifacts under `ml-store/models/app-demand`.
+
+The holdout uses earlier event hours for every prediction and freezes the exact inputs with the evaluation. Slice 26 can revise historical totals when late events arrive, so this is an event-time backtest on the current KPI history. Its metrics can differ from live scoring when arrivals are late.
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.app.yml run --rm demand-forecast train
+```
+
 | App | Address | Demo login |
 | --- | --- | --- |
 | Passenger | http://localhost:5173 | client@taasim.demo |

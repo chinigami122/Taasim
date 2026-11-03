@@ -32,6 +32,8 @@ src/*
 !src/spark/
 src/spark/*
 !src/spark/etl_app_ride_requests.py
+!src/spark/app_demand_forecast.py
+!src/spark/test_app_demand_integration.py
 !src/spark/run_ride_request_kpis.sh
 !src/spark/ivysettings.xml
 0_plans/*

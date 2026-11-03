@@ -122,3 +122,20 @@ CREATE TABLE IF NOT EXISTS taasim.app_ride_requests_hourly (
     processed_at timestamp,
     PRIMARY KEY ((city, day), hour, zone)
 );
+
+CREATE TABLE IF NOT EXISTS taasim.demand_forecast_model (
+    city text,
+    version text,
+    trained_through timestamp,
+    PRIMARY KEY (city, trained_through)
+) WITH CLUSTERING ORDER BY (trained_through DESC);
+
+CREATE TABLE IF NOT EXISTS taasim.zone_demand_forecast (
+    city text,
+    target_hour timestamp,
+    generated_at timestamp,
+    source text,
+    model_version text,
+    predicted_requests frozen<map<int, double>>,
+    PRIMARY KEY (city, target_hour)
+) WITH CLUSTERING ORDER BY (target_hour DESC);

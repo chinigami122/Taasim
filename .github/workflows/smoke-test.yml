@@ -38,6 +38,17 @@ jobs:
         run: node scripts/wait_for_stack.mjs
       - name: Verify the ride request analytics pipeline
         run: node scripts/test_ride_request_kpis.mjs
+      - name: Verify point-in-time forecast features
+        run: PYTHONPATH=src/spark python3 scripts/test_app_demand_forecast.py
+      - name: Verify forecasts stay unavailable with sparse app history
+        run: |
+          set -o pipefail
+          docker compose -f docker-compose.yml -f docker-compose.app.yml run --rm --no-deps demand-forecast | tee forecast-smoke.log
+          grep -F 'insufficient app history' forecast-smoke.log
+      - name: Verify forecast evaluation and publication with synthetic history
+        run: >-
+          docker compose -f docker-compose.yml -f docker-compose.app.yml run --rm --no-deps
+          -e TAASIM_SPARK_JOB=test_app_demand_integration.py demand-forecast
       - name: Exercise real ride lifecycle
         run: node scripts/test_all_apps.mjs
       - name: k6 request/status load (20 virtual users)
